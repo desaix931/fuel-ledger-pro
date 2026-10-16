@@ -1,0 +1,28 @@
+<% const title = 'Equipment'; %>
+<h1>Equipment</h1>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<div class="card">
+  <h2 style="margin-top:0">Add equipment</h2>
+  <form method="post" action="/admin/equipment">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Label <input type="text" name="label" required maxlength="120" placeholder="e.g. Gen 3"></label>
+      <label>Type <input type="text" name="eq_type" maxlength="60" placeholder="e.g. generator"></label>
+      <label>Home site (optional) <select name="site_id"><option value="">— none —</option>
+        <% sites.forEach((s) => { %><option value="<%= s.id %>"><%= s.customer_name %> — <%= s.name %></option><% }) %></select></label>
+    </div>
+    <p><button class="btn-primary" type="submit">Add equipment</button></p>
+  </form>
+  <p class="muted">Drivers can also type any equipment name when logging a fill; registered equipment here shows up as tap-to-reuse suggestions.</p>
+</div>
+<div class="card">
+  <table class="grid">
+    <tr><th>Label</th><th>Type</th><th>Site</th><th>Status</th><th></th></tr>
+    <% equipment.forEach((e) => { %>
+      <tr><td><%= e.label %></td><td class="muted"><%= e.eq_type || '—' %></td><td class="muted"><%= e.site_name ? e.customer_name + ' — ' + e.site_name : '—' %></td>
+      <td><% if (e.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
+      <td><form method="post" action="/admin/equipment/<%= e.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn-sm" type="submit"><%= e.active ? 'Disable' : 'Enable' %></button></form></td></tr>
+    <% }) %>
+  </table>
+</div>

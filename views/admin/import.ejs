@@ -1,0 +1,34 @@
+<% const title = 'Import CSV'; %>
+<h1>Import entries from CSV</h1>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<% if (result) { %>
+  <div class="alert <%= result.skipped.length ? 'info' : 'ok' %>">
+    <strong>Imported <%= result.imported %> fills.</strong>
+    <% if (result.skipped.length) { %>
+      <div style="margin-top:.5rem">Skipped rows:</div>
+      <ul><% result.skipped.forEach((s) => { %><li><%= s %></li><% }) %></ul>
+    <% } %>
+  </div>
+<% } %>
+<div class="card">
+  <p>Upload a CSV with this header row (order doesn't matter):</p>
+  <pre class="ledger">date,customer,site,equipment,fuel_type,gallons,driver,notes</pre>
+  <ul class="muted">
+    <li><strong>date</strong>: <code>YYYY-MM-DD</code> or <code>YYYY-MM-DD HH:mm</code> (e.g. <code>2026-10-15 14:30</code>)</li>
+    <li><strong>customer</strong>: matched by name; created if it doesn't exist</li>
+    <li><strong>site</strong>: matched within the customer; created if missing; may be blank</li>
+    <li><strong>driver</strong>: matched by email or name to an existing driver; otherwise the default driver below is used</li>
+    <li><strong>gallons</strong>: positive number</li>
+  </ul>
+  <form method="post" action="/admin/import" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>CSV file <input type="file" name="file" accept=".csv,text/csv" required></label>
+    <label>Default driver (for unmatched driver names)
+      <select name="default_driver_id" required>
+        <option value="">— pick —</option>
+        <% drivers.forEach((d) => { %><option value="<%= d.id %>"><%= d.name %> (<%= d.email %>)</option><% }) %>
+      </select>
+    </label>
+    <p><button class="btn-primary" type="submit">Import</button></p>
+  </form>
+</div>

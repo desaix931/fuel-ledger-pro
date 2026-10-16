@@ -1,0 +1,48 @@
+# Render blueprint for fuel-ledger-pro.
+# Deploy: Render dashboard -> New -> Blueprint -> point at your repo.
+# The web service and the managed Postgres database below are created together.
+services:
+  - type: web
+    name: fuel-ledger-pro
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fuel-ledger-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false        # fill in on first deploy; creates the admin account
+      - key: ADMIN_PASSWORD
+        sync: false        # fill in on first deploy; change it after login
+      - key: COMPANY_NAME
+        sync: false
+      - key: COMPANY_PHONE
+        sync: false
+      - key: COMPANY_EMAIL
+        sync: false
+      - key: COMPANY_ADDRESS
+        sync: false
+      # --- Email (optional; enables "Email this ledger") -------------------
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SECURE
+        value: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+databases:
+  - name: fuel-ledger-db
+    plan: starter
+    # Managed Postgres — data survives restarts and deploys.

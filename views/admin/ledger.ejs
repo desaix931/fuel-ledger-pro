@@ -1,0 +1,17 @@
+<% const title = 'Ledger builder'; %>
+<h1>Ledger builder</h1>
+<div class="card narrow" style="max-width:520px;margin:1rem 0">
+  <form method="get" action="/admin/ledger/view">
+    <label>Customer
+      <select name="customer_id" required>
+        <option value="">— pick customer —</option>
+        <% customers.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+      </select>
+    </label>
+    <div class="filters">
+      <label>From <input type="date" name="from"></label>
+      <label>To <input type="date" name="to"></label>
+    </div>
+    <p><button class="btn-primary btn-block" type="submit">Build ledger</button></p>
+  </form>
+</div>

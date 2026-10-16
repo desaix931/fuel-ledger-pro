@@ -1,0 +1,33 @@
+<% const title = 'Entry log'; %>
+<h1>Entry log</h1>
+<div class="card">
+  <form method="get" action="/admin/entries">
+    <div class="filters">
+      <label>From <input type="date" name="from" value="<%= f.from %>"></label>
+      <label>To <input type="date" name="to" value="<%= f.to %>"></label>
+      <label>Customer <select name="customer_id"><option value="">All</option>
+        <% customers.forEach((c) => { %><option value="<%= c.id %>" <%= String(f.customer_id) === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %></select></label>
+      <label>Driver <select name="driver_id"><option value="">All</option>
+        <% drivers.forEach((d) => { %><option value="<%= d.id %>" <%= String(f.driver_id) === String(d.id) ? 'selected' : '' %>><%= d.name %></option><% }) %></select></label>
+      <label>Site <select name="site_id"><option value="">All</option>
+        <% sites.forEach((s) => { %><option value="<%= s.id %>" <%= String(f.site_id) === String(s.id) ? 'selected' : '' %>><%= s.customer_name %> — <%= s.name %></option><% }) %></select></label>
+      <label>Fuel type <select name="fuel_type"><option value="">All</option>
+        <% FUEL_TYPES.forEach((t) => { %><option <%= f.fuel_type === t ? 'selected' : '' %>><%= t %></option><% }) %></select></label>
+    </div>
+    <p><button class="btn-primary" type="submit">Filter</button> <a class="btn" href="/admin/entries">Clear</a></p>
+  </form>
+</div>
+<div class="card">
+  <p><strong><%= totals.n %></strong> fills · <strong><%= fmtGal(totals.gal) %> gallons</strong>
+  <span class="muted">(showing up to 500)</span></p>
+  <div style="overflow-x:auto">
+  <table class="grid">
+    <tr><th>Date</th><th>Customer</th><th>Site</th><th>Equipment</th><th>Fuel</th><th class="num">Gal</th><th>Driver</th><th>Notes</th></tr>
+    <% fills.forEach((x) => { %>
+      <tr><td><%= fmtDateTime(x.filled_at) %></td><td><%= x.customer_name %></td><td><%= x.site_name || '—' %></td>
+      <td><%= x.equipment_label %></td><td><%= x.fuel_type %></td><td class="num"><%= fmtGal(x.gallons) %></td>
+      <td><%= x.driver_name %></td><td class="muted"><%= x.notes ? x.notes.slice(0, 60) : '' %></td></tr>
+    <% }) %>
+  </table>
+  </div>
+</div>

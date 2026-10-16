@@ -1,0 +1,61 @@
+<% const title = 'Dispatch'; %>
+<h1>Dispatch</h1>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<div class="card">
+  <h2 style="margin-top:0">Schedule a fueling job</h2>
+  <form method="post" action="/admin/dispatch">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Customer <select name="customer_id" required><option value="">— pick —</option>
+        <% customers.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></label>
+      <label>Date <input type="date" name="scheduled_date" required></label>
+      <label>Window start <input type="time" name="window_start"></label>
+      <label>Window end <input type="time" name="window_end"></label>
+      <label>Driver <select name="driver_id"><option value="">— unassigned —</option>
+        <% drivers.forEach((d) => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></label>
+    </div>
+    <label>Site (optional) <select name="site_id" id="dsite"><option value="">— no specific site —</option></select></label>
+    <label>Notes <textarea name="notes" maxlength="2000" placeholder="Gate code, contact on site, etc."></textarea></label>
+    <p><button class="btn-primary" type="submit">Schedule job</button></p>
+  </form>
+</div>
+<script>
+(function () {
+  var sites = [
+    <% sitesAll.forEach((s) => { %> { id: <%= s.id %>, label: "<%- (s.customer_name + ' — ' + s.name).replace(/"/g, '&quot;') %>", customer: <%= s.customer_id %> },<% }) %>
+  ];
+  var cust = document.querySelector('select[name=customer_id]'),
+      site = document.getElementById('dsite');
+  function rebuild() {
+    var c = cust.value;
+    site.innerHTML = '<option value="">— no specific site —</option>';
+    sites.filter(function (s) { return !c || String(s.customer) === c; }).forEach(function (s) {
+      var o = document.createElement('option');
+      o.value = s.id; o.textContent = s.label;
+      site.appendChild(o);
+    });
+  }
+  cust.addEventListener('change', rebuild); rebuild();
+})();
+</script>
+<div class="card">
+  <h2 style="margin-top:0">Jobs (last 7 days onward)</h2>
+  <table class="grid">
+    <tr><th>Date</th><th>Window</th><th>Customer</th><th>Driver</th><th>Status</th><th></th></tr>
+    <% jobs.forEach((j) => { %>
+      <tr>
+        <td><%= j.scheduled_date instanceof Date ? fmtDate(j.scheduled_date) : j.scheduled_date %></td>
+        <td class="muted"><%= j.window_start ? String(j.window_start).slice(0,5) : '—' %><% if (j.window_end) { %>–<%= String(j.window_end).slice(0,5) %><% } %></td>
+        <td><%= j.customer_name %><% if (j.site_name) { %><br><span class="muted"><%= j.site_name %></span><% } %></td>
+        <td><%= j.driver_name || '<span class="muted">unassigned</span>' %></td>
+        <td><span class="badge"><%= j.status.replace('_',' ') %></span></td>
+        <td><form method="post" action="/admin/dispatch/<%= j.id %>/status" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <select name="status" onchange="this.form.submit()">
+            <% ['scheduled','in_progress','done','cancelled'].forEach((s) => { %>
+              <option value="<%= s %>" <%= j.status === s ? 'selected' : '' %>><%= s.replace('_',' ') %></option>
+            <% }) %>
+          </select></form></td>
+      </tr>
+    <% }) %>
+  </table>
+</div>

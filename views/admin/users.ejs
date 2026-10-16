@@ -1,0 +1,43 @@
+<% const title = 'Users'; %>
+<h1>Users</h1>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<div class="card">
+  <h2 style="margin-top:0">Add user</h2>
+  <form method="post" action="/admin/users">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Name <input type="text" name="name" required maxlength="120"></label>
+      <label>Email <input type="email" name="email" required></label>
+      <label>Password (min 8) <input type="password" name="password" required minlength="8"></label>
+      <label>Role <select name="role"><option value="driver">Driver</option><option value="admin">Admin (office)</option></select></label>
+    </div>
+    <p><button class="btn-primary" type="submit">Create user</button></p>
+  </form>
+</div>
+<div class="card">
+  <table class="grid">
+    <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+    <% users.forEach((u) => { %>
+      <tr>
+        <td><%= u.name %></td><td><%= u.email %></td><td><%= u.role %></td>
+        <td><% if (u.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
+        <td><div class="rowbtns">
+          <form method="post" action="/admin/users/<%= u.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-sm" type="submit" <%= u.email === user.email ? 'disabled' : '' %>><%= u.active ? 'Disable' : 'Enable' %></button></form>
+          <form method="post" action="/admin/users/<%= u.id %>/reset-password" class="inline" onsubmit="return setPw(this)"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-sm" type="submit">Reset password</button></form>
+        </div></td>
+      </tr>
+    <% }) %>
+  </table>
+</div>
+<script>
+function setPw(form) {
+  var pw = prompt('Enter the new password (min 8 characters):');
+  if (!pw || pw.length < 8) { alert('Password must be at least 8 characters.'); return false; }
+  var i = document.createElement('input');
+  i.type = 'hidden'; i.name = 'password'; i.value = pw;
+  form.appendChild(i);
+  return true;
+}
+</script>

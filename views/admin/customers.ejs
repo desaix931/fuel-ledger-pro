@@ -1,0 +1,37 @@
+<% const title = 'Customers'; %>
+<h1>Customers</h1>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<div class="card">
+  <h2 style="margin-top:0">Add customer</h2>
+  <form method="post" action="/admin/customers">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Name <input type="text" name="name" required maxlength="160"></label>
+      <label>Contact name <input type="text" name="contact_name" maxlength="120"></label>
+      <label>Contact email <input type="email" name="contact_email" maxlength="160"></label>
+      <label>Contact phone <input type="text" name="contact_phone" maxlength="40"></label>
+    </div>
+    <label>Notes <textarea name="notes" maxlength="2000"></textarea></label>
+    <p><button class="btn-primary" type="submit">Add customer</button></p>
+  </form>
+</div>
+<% customers.forEach((c) => { %>
+  <div class="card">
+    <form method="post" action="/admin/customers/<%= c.id %>/edit">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="filters">
+        <label>Name <input type="text" name="name" required maxlength="160" value="<%= c.name %>"></label>
+        <label>Contact name <input type="text" name="contact_name" maxlength="120" value="<%= c.contact_name || '' %>"></label>
+        <label>Contact email <input type="email" name="contact_email" maxlength="160" value="<%= c.contact_email || '' %>"></label>
+        <label>Contact phone <input type="text" name="contact_phone" maxlength="40" value="<%= c.contact_phone || '' %>"></label>
+      </div>
+      <label>Notes <textarea name="notes" maxlength="2000"><%= c.notes || '' %></textarea></label>
+      <div class="rowbtns">
+        <button class="btn-primary btn-sm" type="submit">Save</button>
+        <% if (c.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %>
+    </form>
+    <form method="post" action="/admin/customers/<%= c.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-sm" type="submit"><%= c.active ? 'Disable' : 'Enable' %></button></form>
+      </div>
+  </div>
+<% }) %>

@@ -1,0 +1,16 @@
+<% const title = 'Log in'; %>
+<div class="card narrow">
+  <h1>Log in</h1>
+  <% if (error) { %><p class="alert err"><%= error %></p><% } %>
+  <form method="post" action="/login">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="next" value="<%= next %>">
+    <label>Email
+      <input type="email" name="email" required autocomplete="username" inputmode="email">
+    </label>
+    <label>Password
+      <input type="password" name="password" required autocomplete="current-password">
+    </label>
+    <button class="btn-primary btn-block" type="submit">Log in</button>
+  </form>
+</div>

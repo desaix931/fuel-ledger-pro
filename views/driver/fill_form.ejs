@@ -1,0 +1,101 @@
+<% const title = editing ? 'Edit fill' : 'Log a fill'; %>
+<h1><%= editing ? 'Edit fill' : 'Log a fill' %></h1>
+<% if (errors && errors.length) { %><div class="alert err"><% errors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
+
+<form method="post" action="<%= editing ? '/driver/fills/' + editing.id + '/edit' : '/driver/fills' %>" id="fillform">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <div class="card">
+    <label>Customer
+      <select name="customer_id" id="customer" required>
+        <option value="">— pick customer —</option>
+        <% lookups.customers.forEach((c) => { %>
+          <option value="<%= c.id %>" <%= String(form.customer_id) === String(c.id) ? 'selected' : '' %>><%= c.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Site
+      <select name="site_id" id="site">
+        <option value="">— no site / other —</option>
+        <% lookups.sites.forEach((s) => { %>
+          <option value="<%= s.id %>" data-customer="<%= s.customer_id %>" <%= String(form.site_id) === String(s.id) ? 'selected' : '' %>><%= s.customer_name %> — <%= s.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Equipment
+      <input type="text" name="equipment_label" id="equipment" required maxlength="120"
+             placeholder="e.g. Gen 3" value="<%= form.equipment_label || '' %>" autocomplete="off">
+    </label>
+    <% if (lookups.recentEquipment.length) { %>
+      <div class="muted" style="font-size:.85rem">Tap to reuse:</div>
+      <div class="chips" id="eqchips">
+        <% lookups.recentEquipment.forEach((e) => { %>
+          <button type="button" class="chip" data-eq="<%= e %>"><%= e %></button>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <label>Fuel type
+      <select name="fuel_type" id="fueltype" required>
+        <% FUEL_TYPES.forEach((t) => { %>
+          <option value="<%= t %>" <%= form.fuel_type === t ? 'selected' : '' %>><%= t %></option>
+        <% }) %>
+        <option value="__custom" <%= form.fuel_type === '__custom' ? 'selected' : '' %>>Custom…</option>
+      </select>
+    </label>
+    <label id="customfuelwrap" style="display:<%= form.fuel_type === '__custom' ? 'block' : 'none' %>">Custom fuel type
+      <input type="text" name="fuel_type_custom" maxlength="60" value="<%= form.fuel_type_custom || '' %>">
+    </label>
+    <label>Gallons
+      <input type="number" name="gallons" id="gallons" required min="0.01" step="0.01" inputmode="decimal"
+             placeholder="0.00" value="<%= form.gallons || '' %>" style="font-size:1.4rem;font-weight:700">
+    </label>
+    <div class="galpad" id="galpad">
+      <% [10, 25, 50, 100, 250, 500].forEach((g) => { %>
+        <button type="button" data-add="<%= g %>">+<%= g %></button>
+      <% }) %>
+    </div>
+    <label>Date &amp; time
+      <input type="datetime-local" name="filled_at" required value="<%= form.filled_at || '' %>">
+    </label>
+    <label>Notes (optional)
+      <textarea name="notes" maxlength="2000" placeholder="Meter readings, issues, etc."><%= form.notes || '' %></textarea>
+    </label>
+  </div>
+
+  <button class="btn-primary btn-block" type="submit" style="font-size:1.2rem;padding:1rem"><%= editing ? 'Save changes' : 'Save fill' %></button>
+  <% if (editing) { %><p style="text-align:center"><a href="/driver/fills">Cancel</a></p><% } %>
+</form>
+
+<script>
+(function () {
+  var cust = document.getElementById('customer'),
+      site = document.getElementById('site'),
+      eq = document.getElementById('equipment'),
+      gal = document.getElementById('gallons'),
+      ft = document.getElementById('fueltype'),
+      cfw = document.getElementById('customfuelwrap');
+  function filterSites() {
+    var c = cust.value;
+    Array.prototype.forEach.call(site.options, function (o) {
+      if (!o.value) { o.hidden = false; return; }
+      o.hidden = !!(c && o.getAttribute('data-customer') !== c);
+    });
+    if (site.selectedOptions[0] && site.selectedOptions[0].hidden) site.value = '';
+  }
+  cust.addEventListener('change', filterSites); filterSites();
+  document.getElementById('eqchips')?.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-eq]'); if (b) eq.value = b.getAttribute('data-eq');
+  });
+  document.getElementById('galpad').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-add]'); if (!b) return;
+    var cur = parseFloat(gal.value) || 0;
+    gal.value = (cur + parseFloat(b.getAttribute('data-add'))).toFixed(2).replace(/\.00$/, '');
+  });
+  ft.addEventListener('change', function () {
+    cfw.style.display = ft.value === '__custom' ? 'block' : 'none';
+  });
+})();
+</script>

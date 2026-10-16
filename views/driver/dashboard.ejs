@@ -1,0 +1,37 @@
+<% const title = 'Driver home'; %>
+<h1>Hi, <%= user.name %></h1>
+
+<div class="card">
+  <h2 style="margin-top:0">Today's work</h2>
+  <div class="stats">
+    <div class="stat"><div class="v"><%= stats.n %></div><div class="l">fills logged today</div></div>
+    <div class="stat"><div class="v"><%= fmtGal(stats.gal) %></div><div class="l">gallons today</div></div>
+  </div>
+  <p style="margin:.8rem 0 0"><a class="btn-primary" href="/driver/fills/new" style="width:100%;text-align:center">+ Log a fill</a></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">My upcoming jobs <a class="btn btn-sm" href="/driver/schedule" style="float:right">Full schedule</a></h2>
+  <% if (!jobs.length) { %><p class="muted">Nothing scheduled. Check back later.</p><% } %>
+  <% jobs.forEach((j) => { %>
+    <div class="card job" style="margin-bottom:.6rem">
+      <strong><%= j.scheduled_date instanceof Date ? fmtDate(j.scheduled_date) : j.scheduled_date %></strong>
+      <% if (j.window_start) { %><span class="muted"> · <%= String(j.window_start).slice(0,5) %><% if (j.window_end) { %>–<%= String(j.window_end).slice(0,5) %><% } %></span><% } %><br>
+      <%= j.customer_name %><% if (j.site_name) { %> — <%= j.site_name %><% } %>
+      <% if (j.notes) { %><br><span class="muted"><%= j.notes %></span><% } %>
+    </div>
+  <% }) %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Recent fills <a class="btn btn-sm" href="/driver/fills" style="float:right">All mine</a></h2>
+  <% if (!recent.length) { %><p class="muted">No fills yet.</p><% } %>
+  <table class="grid">
+    <% recent.forEach((f) => { %>
+      <tr>
+        <td><%= fmtDateTime(f.filled_at) %><br><span class="muted"><%= f.customer_name %> · <%= f.equipment_label %></span></td>
+        <td class="num"><strong><%= fmtGal(f.gallons) %></strong><br><span class="muted"><%= f.fuel_type %></span></td>
+      </tr>
+    <% }) %>
+  </table>
+</div>

@@ -1,0 +1,27 @@
+<% const title = 'Sites'; %>
+<h1>Sites</h1>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<div class="card">
+  <h2 style="margin-top:0">Add site</h2>
+  <form method="post" action="/admin/sites">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Customer <select name="customer_id" required><option value="">— pick —</option>
+        <% customers.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></label>
+      <label>Site name <input type="text" name="name" required maxlength="160" placeholder="e.g. Lake Mariner"></label>
+      <label>Address <input type="text" name="address" maxlength="300"></label>
+    </div>
+    <p><button class="btn-primary" type="submit">Add site</button></p>
+  </form>
+</div>
+<div class="card">
+  <table class="grid">
+    <tr><th>Site</th><th>Customer</th><th>Address</th><th>Status</th><th></th></tr>
+    <% sites.forEach((s) => { %>
+      <tr><td><%= s.name %></td><td><%= s.customer_name %></td><td class="muted"><%= s.address || '—' %></td>
+      <td><% if (s.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
+      <td><form method="post" action="/admin/sites/<%= s.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn-sm" type="submit"><%= s.active ? 'Disable' : 'Enable' %></button></form></td></tr>
+    <% }) %>
+  </table>
+</div>

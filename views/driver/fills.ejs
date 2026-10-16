@@ -1,0 +1,20 @@
+<% const title = 'My fills'; %>
+<h1>My fills <span class="muted" style="font-size:1rem">(last 90 days)</span></h1>
+<% if (typeof saved !== 'undefined' && saved) { %><p class="alert ok">Fill saved.</p><% } %>
+<p><a class="btn-primary" href="/driver/fills/new">+ Log a fill</a></p>
+<% if (!fills.length) { %><div class="card"><p class="muted">No fills yet.</p></div><% } %>
+<% fills.forEach((f) => { %>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:start">
+      <div>
+        <strong style="font-size:1.15rem"><%= fmtGal(f.gallons) %> gal</strong> · <%= f.fuel_type %><br>
+        <span class="muted"><%= fmtDateTime(f.filled_at) %></span><br>
+        <%= f.customer_name %><% if (f.site_name) { %> — <%= f.site_name %><% } %> · <%= f.equipment_label %>
+        <% if (f.notes) { %><br><span class="muted"><%= f.notes %></span><% } %>
+      </div>
+      <div class="rowbtns">
+        <a class="btn btn-sm" href="/driver/fills/<%= f.id %>/edit">Edit</a>
+      </div>
+    </div>
+  </div>
+<% }) %>

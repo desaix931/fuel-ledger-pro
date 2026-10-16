@@ -1,0 +1,13 @@
+<% const title = 'My schedule'; %>
+<h1>My schedule</h1>
+<% if (!jobs.length) { %><div class="card"><p class="muted">Nothing scheduled ahead.</p></div><% } %>
+<% jobs.forEach((j) => { %>
+  <div class="card job <%= j.status %>">
+    <strong><%= j.scheduled_date instanceof Date ? fmtDate(j.scheduled_date) : j.scheduled_date %></strong>
+    <% if (j.window_start) { %><span class="muted"> · <%= String(j.window_start).slice(0,5) %><% if (j.window_end) { %>–<%= String(j.window_end).slice(0,5) %><% } %></span><% } %>
+    <span class="badge" style="float:right"><%= j.status.replace('_', ' ') %></span><br>
+    <strong><%= j.customer_name %></strong><% if (j.site_name) { %> — <%= j.site_name %><% } %><br>
+    <% if (j.site_address) { %><span class="muted"><%= j.site_address %></span><br><% } %>
+    <% if (j.notes) { %><span class="muted"><%= j.notes %></span><% } %>
+  </div>
+<% }) %>

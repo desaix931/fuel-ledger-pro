@@ -1,0 +1,25 @@
+<% const title = 'Settings'; %>
+<h1>Settings</h1>
+<% if (saved) { %><p class="alert ok">Saved.</p><% } %>
+<div class="card">
+  <h2 style="margin-top:0">Company header (printed on ledgers)</h2>
+  <form method="post" action="/admin/settings">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Company name <input type="text" name="company_name" maxlength="300" value="<%= s.company_name || '' %>"></label>
+    <label>Phone <input type="text" name="company_phone" maxlength="300" value="<%= s.company_phone || '' %>"></label>
+    <label>Email <input type="email" name="company_email" maxlength="300" value="<%= s.company_email || '' %>"></label>
+    <label>Address <input type="text" name="company_address" maxlength="300" value="<%= s.company_address || '' %>"></label>
+    <p><button class="btn-primary" type="submit">Save</button></p>
+  </form>
+</div>
+<div class="card">
+  <h2 style="margin-top:0">Billing export</h2>
+  <p class="muted">Download a CSV of fills shaped for accounting import (date, customer, site, equipment, fuel type, gallons, driver).</p>
+  <form method="get" action="/admin/billing.csv">
+    <div class="filters">
+      <label>From <input type="date" name="from"></label>
+      <label>To <input type="date" name="to"></label>
+    </div>
+    <p><button class="btn-primary" type="submit">Download billing CSV</button></p>
+  </form>
+</div>

@@ -1,0 +1,36 @@
+<% const title = 'Dashboard'; %>
+<h1>Dashboard</h1>
+<div class="stats">
+  <div class="stat"><div class="v"><%= today.n %></div><div class="l">fills today · <%= fmtGal(today.gal) %> gal</div></div>
+  <div class="stat"><div class="v"><%= week.n %></div><div class="l">fills this week · <%= fmtGal(week.gal) %> gal</div></div>
+  <div class="stat"><div class="v"><%= month.n %></div><div class="l">fills this month · <%= fmtGal(month.gal) %> gal</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-top:1rem">
+  <div class="card">
+    <h2 style="margin-top:0">Gallons by customer (30 days)</h2>
+    <% if (!byCustomer.length) { %><p class="muted">No fills in the last 30 days.</p><% } %>
+    <table class="grid">
+      <% byCustomer.forEach((r) => { %><tr><td><%= r.name %></td><td class="num"><%= r.n %> fills</td><td class="num"><strong><%= fmtGal(r.gal) %></strong></td></tr><% }) %>
+    </table>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Gallons by day (14 days)</h2>
+    <% if (!byDay.length) { %><p class="muted">No fills in the last 14 days.</p><% } %>
+    <table class="grid">
+      <% byDay.forEach((r) => { %><tr><td><%= fmtDate(r.d) %></td><td class="num"><strong><%= fmtGal(r.gal) %></strong></td></tr><% }) %>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Recent fills</h2>
+  <table class="grid">
+    <tr><th>Date</th><th>Customer</th><th>Equipment</th><th>Fuel</th><th class="num">Gal</th><th>Driver</th></tr>
+    <% recent.forEach((f) => { %>
+      <tr><td><%= fmtDateTime(f.filled_at) %></td><td><%= f.customer_name %></td><td><%= f.equipment_label %></td>
+      <td><%= f.fuel_type %></td><td class="num"><%= fmtGal(f.gallons) %></td><td><%= f.driver_name %></td></tr>
+    <% }) %>
+  </table>
+  <p><a href="/admin/entries">Full entry log →</a></p>
+</div>

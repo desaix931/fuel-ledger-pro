@@ -1,0 +1,30 @@
+{
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "connect-pg-simple": "^10.0.0",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
+    "express-ejs-layouts": "^2.5.1",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.1",
+    "helmet": "^8.0.0",
+    "multer": "^2.0.1",
+    "nodemailer": "^10.1.2",
+    "pdfkit": "^0.17.1",
+    "pg": "^8.13.1"
+  },
+  "description": "Multi-user fuel delivery ledger for fuel distribution businesses",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/server.js",
+  "name": "fuel-ledger-pro",
+  "scripts": {
+    "migrate": "node src/migrate.js",
+    "start": "node src/server.js"
+  },
+  "version": "1.0.0"
+}
