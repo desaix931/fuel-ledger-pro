@@ -14,6 +14,15 @@ router.use(requireAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Delete every stored login session for a user, signing them out on all
+// devices immediately (lost phone, etc.). Sessions live in the
+// connect-pg-simple "session" table as JSON.
+async function killUserSessions(userId) {
+  try {
+    await pool.query(`DELETE FROM session WHERE sess->>'userId' = $1`, [String(userId)]);
+  } catch (e) { /* session table may not exist yet */ }
+}
+
 // ---------- Dashboard ----------
 router.get('/', async (req, res) => {
   const [today, week, month, byCustomer, byDay, recent] = await Promise.all([
@@ -194,7 +203,12 @@ router.get('/entries/:fillId/documents/:docId', async (req, res) => {
 // ---------- Users ----------
 router.get('/users', async (req, res) => {
   const { rows } = await pool.query('SELECT id, email, name, role, active, created_at FROM users ORDER BY role, name');
-  res.render('admin/users', { users: rows, error: null });
+  const online = {};
+  try {
+    const s = await pool.query(`SELECT DISTINCT sess->>'userId' AS uid FROM session WHERE expire > NOW() AND sess->>'userId' IS NOT NULL`);
+    for (const r of s.rows) online[r.uid] = true;
+  } catch (e) { /* session table may not exist yet */ }
+  res.render('admin/users', { users: rows, online, error: null, msg: req.query.loggedout ? 'User has been logged out on all devices.' : null });
 });
 
 router.post('/users', requireCsrf, async (req, res) => {
@@ -221,8 +235,22 @@ router.post('/users/:id/toggle', requireCsrf, async (req, res) => {
   if (String(req.params.id) === String(res.locals.user.id)) {
     return res.status(400).send('You cannot disable your own account.');
   }
+  const cur = await pool.query('SELECT active FROM users WHERE id = $1', [req.params.id]);
   await pool.query('UPDATE users SET active = NOT active WHERE id = $1', [req.params.id]);
+  if (cur.rows[0] && cur.rows[0].active) {
+    // Just disabled: kill any live sessions immediately so the device can't keep working.
+    await killUserSessions(req.params.id);
+  }
   res.redirect('/admin/users');
+});
+
+// Kill switch: force-logout a user on every device (lost phone, etc.).
+router.post('/users/:id/logout', requireCsrf, async (req, res) => {
+  if (String(req.params.id) === String(res.locals.user.id)) {
+    return res.status(400).send('Use the Log out button to sign yourself out.');
+  }
+  await killUserSessions(req.params.id);
+  res.redirect('/admin/users?loggedout=1');
 });
 
 router.post('/users/:id/reset-password', requireCsrf, async (req, res) => {

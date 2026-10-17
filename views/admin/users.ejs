@@ -1,6 +1,7 @@
 <% const title = 'Users'; %>
 <h1>Users</h1>
 <% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<% if (msg) { %><p class="alert ok"><%= msg %></p><% } %>
 <div class="card">
   <h2 style="margin-top:0">Add user</h2>
   <form method="post" action="/admin/users">
@@ -20,10 +21,14 @@
     <% users.forEach((u) => { %>
       <tr>
         <td><%= u.name %></td><td><%= u.email %></td><td><%= u.role %></td>
-        <td><% if (u.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
+        <td><% if (u.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %>
+          <% if (online[u.id]) { %> <span class="badge" style="background:#e6f7ec;color:#0a7a2f">● online</span><% } %></td>
         <td><div class="rowbtns">
           <form method="post" action="/admin/users/<%= u.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-sm" type="submit" <%= u.email === user.email ? 'disabled' : '' %>><%= u.active ? 'Disable' : 'Enable' %></button></form>
+          <form method="post" action="/admin/users/<%= u.id %>/logout" class="inline"
+                onsubmit="return confirm('Log <%= u.name.replace(/'/g, "\\'") %> out on every device? They will have to sign in again.')"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-sm" type="submit" <%= u.email === user.email ? 'disabled' : '' %>>Log out</button></form>
           <form method="post" action="/admin/users/<%= u.id %>/reset-password" class="inline" onsubmit="return setPw(this)"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-sm" type="submit">Reset password</button></form>
         </div></td>
