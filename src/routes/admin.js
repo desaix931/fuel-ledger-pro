@@ -197,7 +197,7 @@ router.get('/sites', async (req, res) => {
     pool.query(`SELECT s.*, c.name AS customer_name FROM sites s JOIN customers c ON c.id = s.customer_id ORDER BY c.name, s.name`),
     pool.query('SELECT id, name FROM customers WHERE active ORDER BY name'),
   ]);
-  res.render('admin/sites', { sites: sites.rows, customers: customers.rows, error: null });
+  res.render('admin/sites', { sites: sites.rows, customers: customers.rows, error: null, editId: req.query.edit || null });
 });
 
 router.post('/sites', requireCsrf, async (req, res) => {
@@ -207,10 +207,24 @@ router.post('/sites', requireCsrf, async (req, res) => {
     pool.query(`SELECT s.*, c.name AS customer_name FROM sites s JOIN customers c ON c.id = s.customer_id ORDER BY c.name, s.name`),
     pool.query('SELECT id, name FROM customers WHERE active ORDER BY name'),
   ]);
-  if (!name || !customerId) return res.status(400).render('admin/sites', { sites: sites.rows, customers: customers.rows, error: 'Site name and customer are required.' });
+  if (!name || !customerId) return res.status(400).render('admin/sites', { sites: sites.rows, customers: customers.rows, error: 'Site name and customer are required.', editId: null });
   await pool.query('INSERT INTO sites (customer_id, name, address) VALUES ($1,$2,$3)',
     [customerId, name, String(req.body.address || '').trim().slice(0, 300) || null]);
   res.redirect('/admin/sites?created=1');
+});
+
+router.post('/sites/:id/edit', requireCsrf, async (req, res) => {
+  const name = String(req.body.name || '').trim().slice(0, 160);
+  const customerId = parseInt(req.body.customer_id, 10);
+  const address = String(req.body.address || '').trim().slice(0, 300) || null;
+  const [sites, customers] = await Promise.all([
+    pool.query(`SELECT s.*, c.name AS customer_name FROM sites s JOIN customers c ON c.id = s.customer_id ORDER BY c.name, s.name`),
+    pool.query('SELECT id, name FROM customers WHERE active ORDER BY name'),
+  ]);
+  if (!name || !customerId) return res.status(400).render('admin/sites', { sites: sites.rows, customers: customers.rows, error: 'Site name and customer are required.', editId: req.params.id });
+  await pool.query('UPDATE sites SET name = $1, customer_id = $2, address = $3 WHERE id = $4',
+    [name, customerId, address, req.params.id]);
+  res.redirect('/admin/sites?updated=1');
 });
 
 router.post('/sites/:id/toggle', requireCsrf, async (req, res) => {
@@ -227,7 +241,7 @@ router.get('/equipment', async (req, res) => {
     pool.query(`SELECT s.id, s.name, c.name AS customer_name FROM sites s
                 JOIN customers c ON c.id = s.customer_id WHERE s.active ORDER BY c.name, s.name`),
   ]);
-  res.render('admin/equipment', { equipment: equipment.rows, sites: sites.rows, error: null });
+  res.render('admin/equipment', { equipment: equipment.rows, sites: sites.rows, error: null, editId: req.query.edit || null });
 });
 
 router.post('/equipment', requireCsrf, async (req, res) => {
@@ -237,10 +251,24 @@ router.post('/equipment', requireCsrf, async (req, res) => {
     pool.query(`SELECT e.*, s.name AS site_name FROM equipment e LEFT JOIN sites s ON s.id = e.site_id ORDER BY e.label`),
     pool.query('SELECT id, name FROM sites WHERE active ORDER BY name'),
   ]);
-  if (!label) return res.status(400).render('admin/equipment', { equipment: equipment.rows, sites: sites.rows, error: 'Equipment label is required.' });
+  if (!label) return res.status(400).render('admin/equipment', { equipment: equipment.rows, sites: sites.rows, error: 'Equipment label is required.', editId: null });
   await pool.query('INSERT INTO equipment (site_id, label, eq_type) VALUES ($1,$2,$3)',
     [siteId, label, String(req.body.eq_type || '').trim().slice(0, 60) || null]);
   res.redirect('/admin/equipment?created=1');
+});
+
+router.post('/equipment/:id/edit', requireCsrf, async (req, res) => {
+  const label = String(req.body.label || '').trim().slice(0, 120);
+  const siteId = req.body.site_id ? parseInt(req.body.site_id, 10) : null;
+  const eqType = String(req.body.eq_type || '').trim().slice(0, 60) || null;
+  const [equipment, sites] = await Promise.all([
+    pool.query(`SELECT e.*, s.name AS site_name FROM equipment e LEFT JOIN sites s ON s.id = e.site_id ORDER BY e.label`),
+    pool.query('SELECT id, name FROM sites WHERE active ORDER BY name'),
+  ]);
+  if (!label) return res.status(400).render('admin/equipment', { equipment: equipment.rows, sites: sites.rows, error: 'Equipment label is required.', editId: req.params.id });
+  await pool.query('UPDATE equipment SET label = $1, site_id = $2, eq_type = $3 WHERE id = $4',
+    [label, siteId, eqType, req.params.id]);
+  res.redirect('/admin/equipment?updated=1');
 });
 
 router.post('/equipment/:id/toggle', requireCsrf, async (req, res) => {

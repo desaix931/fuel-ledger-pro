@@ -19,10 +19,27 @@
   <table class="grid">
     <tr><th>Label</th><th>Type</th><th>Site</th><th>Status</th><th></th></tr>
     <% equipment.forEach((e) => { %>
+      <% if (String(editId) === String(e.id)) { %>
+      <tr>
+        <form method="post" action="/admin/equipment/<%= e.id %>/edit">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <td><input type="text" name="label" value="<%= e.label %>" required maxlength="120" style="width:100%"></td>
+          <td><input type="text" name="eq_type" value="<%= e.eq_type || '' %>" maxlength="60" style="width:100%"></td>
+          <td><select name="site_id"><option value="">— none —</option>
+            <% sites.forEach((s) => { %><option value="<%= s.id %>" <%= String(s.id) === String(e.site_id) ? 'selected' : '' %>><%= s.customer_name %> — <%= s.name %></option><% }) %>
+          </select></td>
+          <td><% if (e.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
+          <td style="white-space:nowrap"><button class="btn-primary btn-sm" type="submit">Save</button>
+            <a class="btn btn-sm" href="/admin/equipment">Cancel</a></td>
+        </form>
+      </tr>
+      <% } else { %>
       <tr><td><%= e.label %></td><td class="muted"><%= e.eq_type || '—' %></td><td class="muted"><%= e.site_name ? e.customer_name + ' — ' + e.site_name : '—' %></td>
       <td><% if (e.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
-      <td><form method="post" action="/admin/equipment/<%= e.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <td style="white-space:nowrap"><a class="btn btn-sm" href="/admin/equipment?edit=<%= e.id %>">Edit</a>
+        <form method="post" action="/admin/equipment/<%= e.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button class="btn btn-sm" type="submit"><%= e.active ? 'Disable' : 'Enable' %></button></form></td></tr>
+      <% } %>
     <% }) %>
   </table>
 </div>

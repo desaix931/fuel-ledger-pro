@@ -18,10 +18,27 @@
   <table class="grid">
     <tr><th>Site</th><th>Customer</th><th>Address</th><th>Status</th><th></th></tr>
     <% sites.forEach((s) => { %>
+      <% if (String(editId) === String(s.id)) { %>
+      <tr>
+        <form method="post" action="/admin/sites/<%= s.id %>/edit">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <td><input type="text" name="name" value="<%= s.name %>" required maxlength="160" style="width:100%"></td>
+          <td><select name="customer_id" required>
+            <% customers.forEach((c) => { %><option value="<%= c.id %>" <%= String(c.id) === String(s.customer_id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+          </select></td>
+          <td><input type="text" name="address" value="<%= s.address || '' %>" maxlength="300" style="width:100%"></td>
+          <td><% if (s.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
+          <td style="white-space:nowrap"><button class="btn-primary btn-sm" type="submit">Save</button>
+            <a class="btn btn-sm" href="/admin/sites">Cancel</a></td>
+        </form>
+      </tr>
+      <% } else { %>
       <tr><td><%= s.name %></td><td><%= s.customer_name %></td><td class="muted"><%= s.address || '—' %></td>
       <td><% if (s.active) { %><span class="badge">active</span><% } else { %><span class="badge off">disabled</span><% } %></td>
-      <td><form method="post" action="/admin/sites/<%= s.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <td style="white-space:nowrap"><a class="btn btn-sm" href="/admin/sites?edit=<%= s.id %>">Edit</a>
+        <form method="post" action="/admin/sites/<%= s.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button class="btn btn-sm" type="submit"><%= s.active ? 'Disable' : 'Enable' %></button></form></td></tr>
+      <% } %>
     <% }) %>
   </table>
 </div>
