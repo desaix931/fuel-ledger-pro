@@ -26,11 +26,17 @@
         <td><div class="rowbtns">
           <form method="post" action="/admin/users/<%= u.id %>/toggle" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-sm" type="submit" <%= u.email === user.email ? 'disabled' : '' %>><%= u.active ? 'Disable' : 'Enable' %></button></form>
+          <form method="post" action="/admin/users/<%= u.id %>/role" class="inline"
+                onsubmit="return confirm('Change <%= u.name.replace(/'/g, "\\'") %> from <%= u.role %> to <%= u.role === 'admin' ? 'driver' : 'admin' %>? They will be signed out and must log in again.')"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-sm" type="submit" <%= u.email === user.email ? 'disabled' : '' %>><%= u.role === 'admin' ? 'Make driver' : 'Make admin' %></button></form>
           <form method="post" action="/admin/users/<%= u.id %>/logout" class="inline"
                 onsubmit="return confirm('Log <%= u.name.replace(/'/g, "\\'") %> out on every device? They will have to sign in again.')"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-sm" type="submit" <%= u.email === user.email ? 'disabled' : '' %>>Log out</button></form>
           <form method="post" action="/admin/users/<%= u.id %>/reset-password" class="inline" onsubmit="return setPw(this)"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-sm" type="submit">Reset password</button></form>
+          <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline"
+                onsubmit="return confirm('Delete <%= u.name.replace(/'/g, "\\'") %> permanently? This only works if they have no fills or jobs on record.')"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-sm btn-danger" type="submit" <%= u.email === user.email ? 'disabled' : '' %>>Delete</button></form>
         </div></td>
       </tr>
     <% }) %>

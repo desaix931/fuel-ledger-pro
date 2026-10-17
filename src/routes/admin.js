@@ -23,6 +23,15 @@ async function killUserSessions(userId) {
   } catch (e) { /* session table may not exist yet */ }
 }
 
+// Banner message for the Users page after an action redirect.
+function usersMsg(q) {
+  if (q.loggedout) return 'User has been logged out on all devices.';
+  if (q.created) return 'User created.';
+  if (q.role) return 'User role updated. They will sign in with the new role next login.';
+  if (q.deleted) return 'User deleted.';
+  return null;
+}
+
 // ---------- Dashboard ----------
 router.get('/', async (req, res) => {
   const [today, week, month, byCustomer, byDay, recent] = await Promise.all([
@@ -213,7 +222,7 @@ router.get('/users', async (req, res) => {
     const s = await pool.query(`SELECT DISTINCT sess->>'userId' AS uid FROM session WHERE expire > NOW() AND sess->>'userId' IS NOT NULL`);
     for (const r of s.rows) online[r.uid] = true;
   } catch (e) { /* session table may not exist yet */ }
-  res.render('admin/users', { users: rows, online, error: null, msg: req.query.loggedout ? 'User has been logged out on all devices.' : null });
+  res.render('admin/users', { users: rows, online, error: null, msg: usersMsg(req.query) });
 });
 
 router.post('/users', requireCsrf, async (req, res) => {
@@ -257,6 +266,48 @@ router.post('/users/:id/logout', requireCsrf, async (req, res) => {
   }
   await killUserSessions(req.params.id);
   res.redirect('/admin/users?loggedout=1');
+});
+
+// Switch a user's role between admin and driver.
+router.post('/users/:id/role', requireCsrf, async (req, res) => {
+  if (String(req.params.id) === String(res.locals.user.id)) {
+    return res.status(400).send('You cannot change your own role.');
+  }
+  const cur = await pool.query('SELECT role FROM users WHERE id = $1', [req.params.id]);
+  if (!cur.rows.length) return res.status(404).send('User not found.');
+  if (cur.rows[0].role === 'admin') {
+    // Never demote the last active admin.
+    const c = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND active AND id <> $1`, [req.params.id]);
+    if (!c.rows[0].n) return res.status(400).send('You cannot demote the last active admin.');
+  }
+  await pool.query(
+    `UPDATE users SET role = CASE WHEN role = 'admin' THEN 'driver' ELSE 'admin' END WHERE id = $1`,
+    [req.params.id]);
+  // Role is cached in the session — sign them out so the new role takes effect on next login.
+  await killUserSessions(req.params.id);
+  res.redirect('/admin/users?role=1');
+});
+
+// Delete a user entirely. Blocked when they have fills or dispatch jobs on
+// record — history must never silently vanish (disable them instead).
+router.post('/users/:id/delete', requireCsrf, async (req, res) => {
+  if (String(req.params.id) === String(res.locals.user.id)) {
+    return res.status(400).send('You cannot delete your own account.');
+  }
+  const refs = await pool.query(
+    `SELECT (SELECT COUNT(*)::int FROM fills WHERE driver_id = $1) AS fills,
+            (SELECT COUNT(*)::int FROM jobs WHERE driver_id = $1) AS jobs`,
+    [req.params.id]);
+  const { fills, jobs } = refs.rows[0];
+  if (fills > 0 || jobs > 0) {
+    return res.status(400).send(
+      `This user has ${fills} fill(s) and ${jobs} dispatch job(s) on record and cannot be deleted — ` +
+      `disable them instead to keep the history intact.`);
+  }
+  await killUserSessions(req.params.id);
+  await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+  res.redirect('/admin/users?deleted=1');
 });
 
 router.post('/users/:id/reset-password', requireCsrf, async (req, res) => {
