@@ -6,6 +6,7 @@
   <div class="rowbtns" style="margin-top:.6rem">
     <a class="btn-primary" href="/admin/ledger/pdf?<%= q %>">Download PDF</a>
     <a class="btn" href="/admin/ledger/csv?<%= q %>">Download CSV</a>
+    <button class="btn" type="button" id="sharebtn" style="display:none">Share…</button>
     <button class="btn" type="button" id="copybtn">Copy as text</button>
     <button class="btn" type="button" onclick="window.print()">Print</button>
   </div>
@@ -73,4 +74,27 @@ document.getElementById('copybtn').addEventListener('click', function () {
     b.textContent = 'Copied ✓'; setTimeout(function () { b.textContent = 'Copy as text'; }, 2000);
   });
 });
+// Native share sheet (phones): sends the ledger PDF through the user's own
+// email/messaging apps — no server email configuration needed.
+(function () {
+  var btn = document.getElementById('sharebtn');
+  if (!btn || !navigator.share || !navigator.canShare) return;
+  btn.style.display = '';
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    fetch('/admin/ledger/pdf?<%- q %>', { credentials: 'same-origin' }).then(function (res) {
+      if (!res.ok) throw new Error('download failed');
+      var disp = res.headers.get('Content-Disposition') || '';
+      var m = /filename="([^"]+)"/.exec(disp);
+      return res.blob().then(function (blob) {
+        return new File([blob], m ? m[1] : 'fuel-ledger.pdf', { type: 'application/pdf' });
+      });
+    }).then(function (file) {
+      if (!navigator.canShare({ files: [file] })) throw new Error('cannot share files');
+      return navigator.share({ files: [file], title: 'Fuel delivery ledger', text: 'Fuel delivery ledger (PDF attached)' });
+    }).catch(function (e) {
+      if (!e || e.name !== 'AbortError') alert('Sharing is not available on this device — use Download PDF instead.');
+    }).then(function () { btn.disabled = false; });
+  });
+})();
 </script>
