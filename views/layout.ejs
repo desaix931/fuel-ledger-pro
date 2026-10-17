@@ -36,6 +36,7 @@
       <a href="/admin/users">Users</a>
     <% } %>
     <span class="who"><%= user.name %> (<%= user.role %>)</span>
+    <a href="/password" class="linklike">Change password</a>
     <form method="post" action="/logout" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="linklike" type="submit">Log out</button></form>
   </nav>
   <% } %>

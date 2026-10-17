@@ -49,7 +49,15 @@ function todayStr() {
   return fmtDate(new Date());
 }
 
+// Password rule: 4–12 characters. Returns an error message, or null if OK.
+function passwordError(pw) {
+  const s = String(pw || '');
+  if (s.length < 4) return 'Password must be at least 4 characters.';
+  if (s.length > 12) return 'Password must be no more than 12 characters.';
+  return null;
+}
+
 module.exports = {
   FUEL_TYPES, isEmail, parseLocalDateTime, toInputDateTime,
-  fmtDateTime, fmtDate, fmtGal, csvCell, todayStr,
+  fmtDateTime, fmtDate, fmtGal, csvCell, todayStr, passwordError,
 };

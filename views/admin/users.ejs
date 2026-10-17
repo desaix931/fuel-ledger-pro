@@ -9,7 +9,7 @@
     <div class="filters">
       <label>Name <input type="text" name="name" required maxlength="120"></label>
       <label>Email <input type="email" name="email" required></label>
-      <label>Password (min 8) <input type="password" name="password" required minlength="8"></label>
+      <label>Password (4–12) <input type="password" name="password" required minlength="4" maxlength="12"></label>
       <label>Role <select name="role"><option value="driver">Driver</option><option value="admin">Admin (office)</option></select></label>
     </div>
     <p><button class="btn-primary" type="submit">Create user</button></p>
@@ -38,8 +38,8 @@
 </div>
 <script>
 function setPw(form) {
-  var pw = prompt('Enter the new password (min 8 characters):');
-  if (!pw || pw.length < 8) { alert('Password must be at least 8 characters.'); return false; }
+  var pw = prompt('Enter the new password (4–12 characters):');
+  if (!pw || pw.length < 4 || pw.length > 12) { alert('Password must be 4–12 characters.'); return false; }
   var i = document.createElement('input');
   i.type = 'hidden'; i.name = 'password'; i.value = pw;
   form.appendChild(i);

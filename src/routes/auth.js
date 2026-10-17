@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 
 const pool = require('../db');
-const { requireCsrf } = require('../middleware');
-const { isEmail } = require('../lib');
+const { requireLogin, requireCsrf } = require('../middleware');
+const { isEmail, passwordError } = require('../lib');
 
 const router = express.Router();
 
@@ -50,6 +50,32 @@ router.post('/login', loginLimiter, requireCsrf, async (req, res) => {
 
 router.post('/logout', requireCsrf, (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
+});
+
+// Self-service password change (any logged-in user).
+router.get('/password', requireLogin, (req, res) => {
+  res.render('password', { error: null, ok: req.query.ok ? 'Password changed.' : null });
+});
+
+router.post('/password', requireLogin, loginLimiter, requireCsrf, async (req, res) => {
+  const userId = res.locals.user.id;
+  const fail = (error) => res.status(400).render('password', { error, ok: null });
+  const current = String(req.body.current_password || '');
+  const pw1 = String(req.body.new_password || '');
+  const pw2 = String(req.body.confirm_password || '');
+  const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+  if (!rows.length) return fail('Account not found.');
+  if (!(await bcrypt.compare(current, rows[0].password_hash))) return fail('Current password is incorrect.');
+  const pwErr = passwordError(pw1);
+  if (pwErr) return fail(pwErr);
+  if (pw1 !== pw2) return fail('New passwords do not match.');
+  const hash = await bcrypt.hash(pw1, 12);
+  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+  // Sign out every other session for this user (this device stays logged in).
+  try {
+    await pool.query(`DELETE FROM session WHERE sess->>'userId' = $1 AND sid <> $2`, [String(userId), req.sessionID]);
+  } catch (e) { /* session table may not exist yet */ }
+  res.redirect('/password?ok=1');
 });
 
 module.exports = router;

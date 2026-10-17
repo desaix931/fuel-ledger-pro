@@ -6,7 +6,7 @@ const { parse } = require('csv-parse/sync');
 
 const pool = require('../db');
 const { requireAdmin, requireCsrf } = require('../middleware');
-const { isEmail, csvCell, todayStr, FUEL_TYPES, toInputDateTime } = require('../lib');
+const { isEmail, csvCell, todayStr, FUEL_TYPES, toInputDateTime, passwordError } = require('../lib');
 const { bolUploadFields, validateBolDocs, formLookups, validateFill, driverPickerLocals, resolveFillDriver } = require('../fillForm');
 
 const router = express.Router();
@@ -222,10 +222,11 @@ router.post('/users', requireCsrf, async (req, res) => {
   const password = String(req.body.password || '');
   const role = req.body.role === 'admin' ? 'admin' : 'driver';
   const { rows } = await pool.query('SELECT id, email, name, role, active, created_at FROM users ORDER BY role, name');
-  const fail = (error) => res.status(400).render('admin/users', { users: rows, error });
+  const fail = (error) => res.status(400).render('admin/users', { users: rows, online: {}, msg: null, error });
   if (!isEmail(email)) return fail('Enter a valid email address.');
   if (!name) return fail('Enter a name.');
-  if (password.length < 8) return fail('Password must be at least 8 characters.');
+  const pwErr = passwordError(password);
+  if (pwErr) return fail(pwErr);
   try {
     const hash = await bcrypt.hash(password, 12);
     await pool.query('INSERT INTO users (email, name, password_hash, role) VALUES ($1,$2,$3,$4)', [email, name, hash, role]);
@@ -260,7 +261,8 @@ router.post('/users/:id/logout', requireCsrf, async (req, res) => {
 
 router.post('/users/:id/reset-password', requireCsrf, async (req, res) => {
   const password = String(req.body.password || '');
-  if (password.length < 8) return res.status(400).send('Password must be at least 8 characters.');
+  const pwErr = passwordError(password);
+  if (pwErr) return res.status(400).send(pwErr);
   const hash = await bcrypt.hash(password, 12);
   await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.id]);
   res.redirect('/admin/users?reset=1');
