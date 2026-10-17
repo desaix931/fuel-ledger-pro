@@ -11,6 +11,7 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 .topbar { background: #10233a; color: #fff; padding: .6rem .9rem; display: flex;
   flex-wrap: wrap; align-items: center; gap: .4rem .9rem; position: sticky; top: 0; z-index: 10; }
 .topbar .brand { color: #fff; font-weight: 700; text-decoration: none; font-size: 1.05rem; }
+.topbar .brand-logo { height: 34px; width: auto; vertical-align: middle; margin-right: 8px; border-radius: 4px; }
 .topbar nav { display: flex; flex-wrap: wrap; gap: .35rem .8rem; align-items: center; margin-left: auto; }
 .topbar nav a { color: #cfe3f7; text-decoration: none; padding: .35rem .2rem; }
 .topbar .who { color: #9fb6cc; font-size: .85rem; }

@@ -1,11 +1,69 @@
 'use strict';
 const express = require('express');
+const multer = require('multer');
 const pool = require('../db');
 const { requireLogin, requireCsrf } = require('../middleware');
 const { FUEL_TYPES, parseLocalDateTime, toInputDateTime, todayStr } = require('../lib');
 
 const router = express.Router();
 router.use(requireLogin);
+
+// BOL photos: kept in memory and stored as bytea in Postgres
+// (Render's container disk is ephemeral, so disk storage would lose them).
+const bolUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 3 }, // 8 MB per photo, max 3 BOL photos
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) return cb(null, true);
+    cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname));
+  },
+});
+
+// Defense in depth: the client can spoof mimetypes, so sniff the magic bytes too.
+function sniffImageMime(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+// Wrap multer so upload failures become a friendly form error instead of a
+// crash. MUST run before requireCsrf: multer populates req.body (including
+// _csrf) from the multipart form.
+function bolUploadFields(req, res, next) {
+  bolUpload.fields([{ name: 'bol_photos', maxCount: 3 }])(req, res, (err) => {
+    req.bolUploadError = err ? (
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'One of your BOL photos is larger than 8 MB. Please use a smaller photo and try again.'
+        : err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE'
+          ? 'Attach at most 3 BOL photos, and only JPEG, PNG, or WebP images.'
+          : 'There was a problem with your photo upload. Please try again.'
+    ) : null;
+    next();
+  });
+}
+
+// Returns { errors, docs } — sanitized BOL documents ready to store.
+function validateBolDocs(files) {
+  const errors = [];
+  const docs = [];
+  const list = (files && files.bol_photos) || [];
+  for (const f of list) {
+    const sniffed = sniffImageMime(f.buffer);
+    if (!sniffed || f.size > 8 * 1024 * 1024) {
+      errors.push('Each BOL photo must be a JPEG, PNG, or WebP image, 8 MB or smaller.');
+      continue;
+    }
+    docs.push({
+      filename: String(f.originalname || 'bol.jpg').replace(/[^\w.\- ]+/g, '_').slice(0, 120) || 'bol.jpg',
+      mimetype: sniffed,
+      size: f.size,
+      buffer: f.buffer,
+    });
+  }
+  return { errors, docs };
+}
 
 async function formLookups() {
   const [customers, sites, equipment, recentEq] = await Promise.all([
@@ -117,11 +175,15 @@ router.get('/fills/new', async (req, res) => {
   });
 });
 
-router.post('/fills', requireCsrf, async (req, res) => {
+router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
   const { errors, data } = validateFill(req.body);
-  if (errors.length) {
+  const { errors: docErrors, docs: bolDocs } = req.bolUploadError
+    ? { errors: [req.bolUploadError], docs: [] }
+    : validateBolDocs(req.files);
+  const allErrors = errors.concat(docErrors);
+  if (allErrors.length) {
     const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors, form: req.body, editing: null });
+    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: null });
   }
   // Verify customer/site exist and are active (and site belongs to customer).
   const cust = await pool.query('SELECT id FROM customers WHERE id = $1 AND active', [data.customerId]);
@@ -137,11 +199,30 @@ router.post('/fills', requireCsrf, async (req, res) => {
       return res.status(400).render('driver/fill_form', { lookups, errors: ['That site does not belong to the chosen customer.'], form: req.body, editing: null });
     }
   }
-  await pool.query(
-    `INSERT INTO fills (filled_at, customer_id, site_id, equipment_label, fuel_type, gallons, driver_id, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, res.locals.user.id, data.notes || null]
-  );
+  // Save the fill + its BOL photos atomically: one transaction, never a half-saved fill.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: ins } = await client.query(
+      `INSERT INTO fills (filled_at, customer_id, site_id, equipment_label, fuel_type, gallons, driver_id, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, res.locals.user.id, data.notes || null]
+    );
+    const fillId = ins[0].id;
+    for (const d of bolDocs) {
+      await client.query(
+        `INSERT INTO fill_documents (fill_id, filename, mimetype, size_bytes, data)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [fillId, d.filename, d.mimetype, d.size, d.buffer]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
   res.redirect('/driver/fills?saved=1');
 });
 
@@ -150,6 +231,8 @@ router.get('/fills/:id/edit', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM fills WHERE id = $1 AND driver_id = $2', [req.params.id, res.locals.user.id]);
   if (!rows.length) return res.status(404).send('Fill not found.');
   const lookups = await formLookups();
+  const docs = await pool.query(
+    'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
   const f = rows[0];
   res.render('driver/fill_form', {
     lookups, errors: [],
@@ -161,23 +244,69 @@ router.get('/fills/:id/edit', async (req, res) => {
       gallons: f.gallons, filled_at: toInputDateTime(f.filled_at), notes: f.notes || '',
     },
     editing: f,
+    bolDocs: docs.rows,
   });
 });
 
-router.post('/fills/:id/edit', requireCsrf, async (req, res) => {
+router.post('/fills/:id/edit', bolUploadFields, requireCsrf, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM fills WHERE id = $1 AND driver_id = $2', [req.params.id, res.locals.user.id]);
   if (!rows.length) return res.status(404).send('Fill not found.');
   const { errors, data } = validateFill(req.body);
-  if (errors.length) {
-    const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors, form: req.body, editing: rows[0] });
+  const { errors: docErrors, docs: bolDocs } = req.bolUploadError
+    ? { errors: [req.bolUploadError], docs: [] }
+    : validateBolDocs(req.files);
+  const existing = await pool.query('SELECT COUNT(*)::int AS n FROM fill_documents WHERE fill_id = $1', [req.params.id]);
+  if (existing.rows[0].n + bolDocs.length > 3) {
+    docErrors.push('A fill can have at most 3 BOL photos. This fill already has ' +
+      existing.rows[0].n + ' — add fewer.');
   }
-  await pool.query(
-    `UPDATE fills SET filled_at=$1, customer_id=$2, site_id=$3, equipment_label=$4,
-     fuel_type=$5, gallons=$6, notes=$7, updated_at=NOW() WHERE id=$8`,
-    [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, req.params.id]
-  );
+  const allErrors = errors.concat(docErrors);
+  if (allErrors.length) {
+    const lookups = await formLookups();
+    const docs = await pool.query(
+      'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
+    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: rows[0], bolDocs: docs.rows });
+  }
+  // Update the fill + append new BOL photos atomically.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE fills SET filled_at=$1, customer_id=$2, site_id=$3, equipment_label=$4,
+       fuel_type=$5, gallons=$6, notes=$7, updated_at=NOW() WHERE id=$8`,
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, req.params.id]
+    );
+    for (const d of bolDocs) {
+      await client.query(
+        `INSERT INTO fill_documents (fill_id, filename, mimetype, size_bytes, data)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [req.params.id, d.filename, d.mimetype, d.size, d.buffer]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
   res.redirect('/driver/fills?saved=1');
+});
+
+// Serve a BOL photo's bytes. Driver-scoped: only the driver who logged the fill.
+router.get('/fills/:id/documents/:docId', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT d.filename, d.mimetype, d.size_bytes, d.data
+     FROM fill_documents d JOIN fills f ON f.id = d.fill_id
+     WHERE d.id = $1 AND d.fill_id = $2 AND f.driver_id = $3`,
+    [req.params.docId, req.params.id, res.locals.user.id]
+  );
+  if (!rows.length) return res.status(404).send('Document not found.');
+  const d = rows[0];
+  res.set('Content-Type', d.mimetype);
+  res.set('Content-Length', String(d.size_bytes));
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.send(d.data);
 });
 
 router.post('/fills/:id/delete', requireCsrf, async (req, res) => {

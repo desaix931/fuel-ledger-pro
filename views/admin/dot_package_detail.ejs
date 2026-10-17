@@ -1,0 +1,89 @@
+<% const title = 'DOT package — ' + p.full_name; %>
+<h1><%= p.full_name %></h1>
+<p class="muted">Submitted <%= fmtDateTime(p.created_at) %>
+  <% if (p.source_ip) { %> · IP <%= p.source_ip %><% } %>
+  · notification email <%= p.email_sent ? 'sent' : 'not sent' %></p>
+
+<div class="card">
+  <form method="post" action="/admin/dot-packages/<%= p.id %>/status" class="inline" style="display:inline">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Status
+      <select name="status">
+        <% [['pending','Pending'],['reviewed','Reviewed'],['filed','Filed']].forEach(([v, l]) => { %>
+          <option value="<%= v %>" <%= p.status === v ? 'selected' : '' %>><%= l %></option>
+        <% }) %>
+      </select>
+    </label>
+    <button class="btn-primary" type="submit">Update status</button>
+  </form>
+  <form method="post" action="/admin/dot-packages/<%= p.id %>/delete" class="inline" style="display:inline;margin-left:1rem"
+        onsubmit="return confirm('Delete this package permanently?')">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn-danger" type="submit">Delete</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Application match</h2>
+  <% if (p.match_status === 'matched' && app) { %>
+    <p>Matched to job application <a href="/admin/applications/<%= app.id %>"><strong><%= app.full_name %></strong> (#<%= app.id %>)</a>.</p>
+  <% } else { %>
+    <p><span class="badge" style="background:#fdf0e4;color:#9a5b00">unmatched</span> — no job application on file for this email/name/DOB. Reconcile manually.</p>
+  <% } %>
+  <p><strong>Email:</strong> <%= p.email %><br><strong>DOB:</strong> <%= p.dob || '—' %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">B. Safety performance history release <span class="muted" style="font-size:.8rem">49 CFR 391.23</span></h2>
+  <% (p.employers || []).forEach((e, i) => { %>
+    <p><strong><%= i + 1 %>. <%= e.company %></strong><%= e.dates ? ' — ' + e.dates : '' %><br>
+      <span class="muted"><%= [e.city, e.state].filter(Boolean).join(', ') %> · contact: <%= e.contact_name || '—' %><%= e.contact_phone ? ', ' + e.contact_phone : '' %><%= e.contact_email ? ', ' + e.contact_email : '' %><br>
+      Function: <%= e.func === 'drove_cmv' ? 'Drove a commercial motor vehicle' : 'Other DOT safety-sensitive function' %></span></p>
+  <% }); %>
+  <p>Signed: <strong><%= p.release_signature %></strong> · <%= p.release_date %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">C. Drug &amp; alcohol testing history <span class="muted" style="font-size:.8rem">Part 382 / 40.25</span></h2>
+  <% const da = p.drug_alcohol_history || {}; %>
+  <% if (da.issue) { %>
+    <p><strong style="color:#a00">YES — positive/refusal reported</strong><br>
+    Employer: <%= da.employer %><br>Date: <%= da.date %><br>Substance: <%= da.substance %><br>SAP status: <%= da.sap %></p>
+  <% } else { %>
+    <p>No positive tests or refusals reported in the past 2 years.</p>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">D. Clearinghouse acknowledgment</h2>
+  <p><%= p.clearinghouse_ack ? 'Acknowledged — driver will register and provide electronic consent.' : 'Not acknowledged.' %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">E. Medical certification</h2>
+  <% const m = p.medical || {}; %>
+  <p>Examiner: <strong><%= m.examiner_name %></strong><br>
+  National Registry #: <%= m.registry_no %><br>
+  Issue: <%= m.issue_date %> · Expiry: <%= m.expiry_date %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">F. 12-month violation certification <span class="muted" style="font-size:.8rem">391.27</span></h2>
+  <% const vv = p.violations || {}; %>
+  <% if (vv.no_violations) { %>
+    <p>Driver certified: <strong>no violations</strong> (other than parking) in the past 12 months.</p>
+  <% } else { %>
+    <table class="grid">
+      <tr><th>Date</th><th>Offense</th><th>Location</th><th>Vehicle</th></tr>
+      <% (vv.items || []).forEach((r) => { %>
+        <tr><td><%= r.date %></td><td><%= r.offense %></td><td><%= r.location %></td><td><%= r.vehicle %></td></tr>
+      <% }); %>
+    </table>
+  <% } %>
+  <p>Signed: <strong><%= p.violation_signature %></strong> · <%= p.violation_date %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">G. Road test acknowledgment <span class="muted" style="font-size:.8rem">391.33</span></h2>
+  <p><%= p.road_test_ack ? 'Acknowledged — driver holds a valid CDL, accepted in lieu of a road test.' : 'Not acknowledged.' %></p>
+</div>

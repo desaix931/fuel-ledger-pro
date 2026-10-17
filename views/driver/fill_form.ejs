@@ -2,7 +2,7 @@
 <h1><%= editing ? 'Edit fill' : 'Log a fill' %></h1>
 <% if (errors && errors.length) { %><div class="alert err"><% errors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
 
-<form method="post" action="<%= editing ? '/driver/fills/' + editing.id + '/edit' : '/driver/fills' %>" id="fillform">
+<form method="post" action="<%= editing ? '/driver/fills/' + editing.id + '/edit' : '/driver/fills' %>" id="fillform" enctype="multipart/form-data">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
   <div class="card">
@@ -65,12 +65,34 @@
     </label>
   </div>
 
+  <div class="card">
+    <h2 style="margin-top:0">BOL photo(s) <span class="muted" style="font-weight:400;font-size:.85rem">(optional, up to 3)</span></h2>
+    <p class="muted" style="margin-top:0">Snap a photo of the bill of lading. On your phone this opens the camera directly. Photos are resized automatically before sending.</p>
+    <% if (editing && typeof bolDocs !== 'undefined' && bolDocs.length) { %>
+      <div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.6rem">
+        <% bolDocs.forEach((d) => { %>
+          <a href="/driver/fills/<%= editing.id %>/documents/<%= d.id %>" target="_blank" rel="noopener">
+            <img src="/driver/fills/<%= editing.id %>/documents/<%= d.id %>" alt="BOL photo"
+                 style="width:120px;height:90px;object-fit:cover;border:1px solid var(--line);border-radius:8px;background:#f5f5f5">
+          </a>
+        <% }) %>
+      </div>
+      <p class="muted" style="font-size:.85rem"><%= bolDocs.length %> photo(s) already attached — you can add more below (3 total max).</p>
+    <% } %>
+    <label>Add BOL photo(s)
+      <input type="file" name="bol_photos" accept="image/*" capture="environment" multiple></label>
+  </div>
+
   <button class="btn-primary btn-block" type="submit" style="font-size:1.2rem;padding:1rem"><%= editing ? 'Save changes' : 'Save fill' %></button>
   <% if (editing) { %><p style="text-align:center"><a href="/driver/fills">Cancel</a></p><% } %>
 </form>
 
+<script src="/js/photo-compress.js"></script>
 <script>
 (function () {
+  // Compress BOL photos on the phone before sending (shared helper).
+  compressPhotosOnSubmit('fillform');
+
   var cust = document.getElementById('customer'),
       site = document.getElementById('site'),
       eq = document.getElementById('equipment'),

@@ -1,0 +1,177 @@
+<% const title = 'DOT Compliance Hiring Package'; %>
+<h1>DOT Compliance Hiring Package</h1>
+<p class="muted">Desaix Transport LLC · Crossville, TN — the pre-hire qualification paperwork for prospective drivers. This is <strong>separate from the job application</strong>; fill it out after you've applied.</p>
+<% if (errors && errors.length) { %><div class="alert err"><% errors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
+
+<form method="post" action="/hire/package" id="hireform">
+  <!-- honeypot: real drivers never see or fill this -->
+  <div style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">A. Link to your application</h2>
+    <p class="muted" style="font-size:.9rem">Enter the same name, email, and date of birth you used on your job application so we can match this paperwork to it.</p>
+    <label>Full name <input type="text" name="full_name" required maxlength="120" autocomplete="name" value="<%= values.full_name %>"></label>
+    <div class="filters">
+      <label>Email <input type="email" name="email" required maxlength="160" autocomplete="email" value="<%= values.email %>"></label>
+      <label>Date of birth <input type="date" name="dob" required value="<%= values.dob %>"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">B. Safety performance history release <span class="muted" style="font-weight:400;font-size:.8rem">(49 CFR 391.23)</span></h2>
+    <p class="muted" style="font-size:.9rem">List <strong>every DOT-regulated employer from the past 3 years</strong> — every company where you operated a commercial motor vehicle or performed other DOT safety-sensitive work.</p>
+    <% values.employers.forEach((e, i) => { const n = i + 1; %>
+      <div data-empblock style="<%= (i > 0 && !e.company) ? 'display:none;' : '' %>border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+        <h3 style="margin:.2rem 0 .5rem">Employer <%= n %><%= n === 1 ? ' <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>' : '' %></h3>
+        <label>Company name <%= n === 1 ? '*' : '' %> <input type="text" name="emp<%= n %>_company" <%= n === 1 ? 'required' : '' %> maxlength="160" value="<%= e.company %>"></label>
+        <div class="filters">
+          <label>City <input type="text" name="emp<%= n %>_city" maxlength="100" value="<%= e.city %>"></label>
+          <label>State <input type="text" name="emp<%= n %>_state" maxlength="60" value="<%= e.state %>"></label>
+        </div>
+        <label>Contact name (dispatcher / safety manager) <input type="text" name="emp<%= n %>_contact_name" maxlength="120" value="<%= e.contact_name %>"></label>
+        <div class="filters">
+          <label>Contact phone <input type="tel" name="emp<%= n %>_contact_phone" maxlength="40" value="<%= e.contact_phone %>"></label>
+          <label>Contact email <input type="email" name="emp<%= n %>_contact_email" maxlength="160" value="<%= e.contact_email %>"></label>
+        </div>
+        <label>Dates employed (e.g. 2021 – 2024) <input type="text" name="emp<%= n %>_dates" maxlength="80" value="<%= e.dates %>"></label>
+        <label>Safety-sensitive function
+          <select name="emp<%= n %>_func">
+            <option value="">— select —</option>
+            <option value="drove_cmv" <%= e.func === 'drove_cmv' ? 'selected' : '' %>>Drove a commercial motor vehicle</option>
+            <option value="other" <%= e.func === 'other' ? 'selected' : '' %>>Other DOT safety-sensitive function</option>
+          </select>
+        </label>
+      </div>
+    <% }); %>
+    <button type="button" class="btn btn-sm" id="addemployer">+ Add another employer</button>
+
+    <div style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:1rem 0;background:var(--wash,#f8f8f8)">
+      <p style="font-size:.9rem;margin:.3rem 0"><strong>Authorization.</strong> I authorize Desaix Transport LLC to obtain my safety performance history — including drug and alcohol testing records — from each employer listed above, and I authorize each listed employer to release that information to Desaix Transport LLC, as required by 49 CFR 391.23.</p>
+    </div>
+    <div class="filters">
+      <label>Type your full name as your signature * <input type="text" name="release_signature" required maxlength="120" value="<%= values.release_signature %>"></label>
+      <label>Date * <input type="date" name="release_date" required value="<%= values.release_date %>"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">C. Drug &amp; alcohol testing history <span class="muted" style="font-weight:400;font-size:.8rem">(49 CFR Part 382 / 40.25)</span></h2>
+    <fieldset style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0" data-yn="drug_test_issue">
+      <legend style="padding:0 .4rem"><strong>In the past 2 years, have you ever tested positive for drugs or alcohol, or refused a DOT drug/alcohol test, with any employer? *</strong></legend>
+      <label style="display:inline-block;margin-right:1.2rem"><input type="radio" name="drug_test_issue" value="yes" style="width:auto" <%= values.drug_test_issue === 'yes' ? 'checked' : '' %>> Yes</label>
+      <label style="display:inline-block"><input type="radio" name="drug_test_issue" value="no" style="width:auto" <%= values.drug_test_issue === 'no' ? 'checked' : '' %>> No</label>
+      <div data-detail style="display:<%= values.drug_test_issue === 'yes' ? 'block' : 'none' %>;margin-top:.5rem">
+        <label>Employer <input type="text" name="da_employer" maxlength="160" value="<%= values.da_employer %>"></label>
+        <div class="filters">
+          <label>Date <input type="date" name="da_date" value="<%= values.da_date %>"></label>
+          <label>Substance involved <input type="text" name="da_substance" maxlength="160" value="<%= values.da_substance %>"></label>
+        </div>
+        <label>SAP return-to-duty status <textarea name="da_sap" maxlength="500" placeholder="Have you completed the Substance Abuse Professional return-to-duty process? If so, when and with whom."><%= values.da_sap %></textarea></label>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">D. FMCSA Drug &amp; Alcohol Clearinghouse acknowledgment</h2>
+    <p style="font-size:.9rem">Desaix Transport LLC will run a <strong>full pre-employment query of the FMCSA Drug &amp; Alcohol Clearinghouse</strong> before you perform any safety-sensitive functions. You must be <strong>registered in the Clearinghouse</strong> and provide <strong>electronic consent</strong> for the query when requested.</p>
+    <label style="display:block;margin:.6rem 0">
+      <input type="checkbox" name="clearinghouse_ack" value="yes" required style="width:auto" <%= values.clearinghouse_ack === 'yes' ? 'checked' : '' %>>
+      <strong>I understand the Clearinghouse query requirement and will register and provide electronic consent when asked. *</strong>
+    </label>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">E. Medical certification details</h2>
+    <p class="muted" style="font-size:.9rem">Your medical card photo is already on file from your application — enter the details here so they match.</p>
+    <label>Medical examiner's name * <input type="text" name="med_examiner_name" required maxlength="160" value="<%= values.med_examiner_name %>"></label>
+    <label>Examiner's National Registry number * <input type="text" name="med_registry_no" required maxlength="40" value="<%= values.med_registry_no %>"></label>
+    <div class="filters">
+      <label>Certificate issue date * <input type="date" name="med_issue_date" required value="<%= values.med_issue_date %>"></label>
+      <label>Certificate expiry date * <input type="date" name="med_expiry_date" required value="<%= values.med_expiry_date %>"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">F. Driver's certification of violations <span class="muted" style="font-weight:400;font-size:.8rem">(49 CFR 391.27)</span></h2>
+    <p class="muted" style="font-size:.9rem">List <strong>all traffic violations (excluding parking)</strong> in the past 12 months, or certify that you had none.</p>
+    <label style="display:block;margin:.6rem 0">
+      <input type="checkbox" name="no_violations" id="noviol" value="yes" style="width:auto" <%= values.no_violations === 'yes' ? 'checked' : '' %>>
+      <strong>I have had NO traffic violations (other than parking) in the past 12 months.</strong>
+    </label>
+    <div id="violrows" style="<%= values.no_violations === 'yes' ? 'display:none;' : '' %>">
+      <% values.violations.forEach((r, i) => { const n = i + 1; %>
+        <div data-violrow style="<%= (i > 0 && !r.date && !r.offense && !r.location && !r.vehicle) ? 'display:none;' : '' %>border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+          <h3 style="margin:.2rem 0 .5rem">Violation <%= n %></h3>
+          <div class="filters">
+            <label>Date <input type="date" name="viol<%= n %>_date" value="<%= r.date %>"></label>
+            <label>Offense <input type="text" name="viol<%= n %>_offense" maxlength="200" value="<%= r.offense %>"></label>
+          </div>
+          <div class="filters">
+            <label>Location <input type="text" name="viol<%= n %>_location" maxlength="160" value="<%= r.location %>"></label>
+            <label>Vehicle type <input type="text" name="viol<%= n %>_vehicle" maxlength="80" placeholder="e.g. tractor-trailer" value="<%= r.vehicle %>"></label>
+          </div>
+        </div>
+      <% }); %>
+      <button type="button" class="btn btn-sm" id="addviol">+ Add another violation</button>
+    </div>
+    <div class="filters" style="margin-top:1rem">
+      <label>Type your full name as your signature * <input type="text" name="viol_signature" required maxlength="120" value="<%= values.viol_signature %>"></label>
+      <label>Date * <input type="date" name="viol_date" required value="<%= values.viol_date %>"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">G. Road test acknowledgment <span class="muted" style="font-weight:400;font-size:.8rem">(49 CFR 391.33)</span></h2>
+    <p style="font-size:.9rem">I hold a valid commercial driver's license. Desaix Transport LLC accepts my valid CDL in lieu of a road test, as permitted by 49 CFR 391.33.</p>
+    <label style="display:block;margin:.6rem 0">
+      <input type="checkbox" name="road_test_ack" value="yes" required style="width:auto" <%= values.road_test_ack === 'yes' ? 'checked' : '' %>>
+      <strong>I hold a valid CDL, which the carrier may accept in lieu of a road test. *</strong>
+    </label>
+  </div>
+
+  <p class="muted" style="font-size:.85rem">By signing above, you certify that the information in this package is true and complete. This form collects the driver's portions of the DOT qualification file — the office runs the MVR, Clearinghouse queries, previous-employer inquiries, and pre-employment drug test separately.</p>
+
+  <button class="btn-primary btn-block" type="submit" style="font-size:1.2rem;padding:1rem">Submit hiring package</button>
+</form>
+
+<script>
+(function () {
+  // Yes/No detail toggle (drug & alcohol history).
+  document.querySelectorAll('fieldset[data-yn]').forEach(function (fs) {
+    var detail = fs.querySelector('[data-detail]');
+    fs.addEventListener('change', function () {
+      var yes = fs.querySelector('input[type=radio][value=yes]').checked;
+      detail.style.display = yes ? 'block' : 'none';
+    });
+  });
+  // Add employer blocks up to 5.
+  var addEmp = document.getElementById('addemployer');
+  if (addEmp) addEmp.addEventListener('click', function () {
+    var blocks = document.querySelectorAll('[data-empblock]');
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].style.display === 'none') { blocks[i].style.display = ''; break; }
+    }
+    var hidden = 0;
+    blocks.forEach(function (b) { if (b.style.display === 'none') hidden++; });
+    if (!hidden) addEmp.style.display = 'none';
+  });
+  // Violations: no-violations checkbox toggles the rows; add rows up to 4.
+  var noviol = document.getElementById('noviol');
+  var violrows = document.getElementById('violrows');
+  var addViol = document.getElementById('addviol');
+  if (noviol && violrows) noviol.addEventListener('change', function () {
+    violrows.style.display = noviol.checked ? 'none' : '';
+  });
+  if (addViol) addViol.addEventListener('click', function () {
+    var rows = violrows.querySelectorAll('[data-violrow]');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].style.display === 'none') { rows[i].style.display = ''; break; }
+    }
+    var hidden = 0;
+    rows.forEach(function (r) { if (r.style.display === 'none') hidden++; });
+    if (!hidden) addViol.style.display = 'none';
+  });
+})();
+</script>

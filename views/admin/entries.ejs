@@ -22,11 +22,13 @@
   <span class="muted">(showing up to 500)</span></p>
   <div style="overflow-x:auto">
   <table class="grid">
-    <tr><th>Date</th><th>Customer</th><th>Site</th><th>Equipment</th><th>Fuel</th><th class="num">Gal</th><th>Driver</th><th>Notes</th></tr>
+    <tr><th>Date</th><th>Customer</th><th>Site</th><th>Equipment</th><th>Fuel</th><th class="num">Gal</th><th>Driver</th><th>BOL</th><th>Notes</th></tr>
     <% fills.forEach((x) => { %>
       <tr><td><%= fmtDateTime(x.filled_at) %></td><td><%= x.customer_name %></td><td><%= x.site_name || '—' %></td>
       <td><%= x.equipment_label %></td><td><%= x.fuel_type %></td><td class="num"><%= fmtGal(x.gallons) %></td>
-      <td><%= x.driver_name %></td><td class="muted"><%= x.notes ? x.notes.slice(0, 60) : '' %></td></tr>
+      <td><%= x.driver_name %></td>
+      <td><% if (Number(x.bol_count) > 0) { %><a href="/admin/entries/<%= x.id %>" class="chip" style="text-decoration:none">BOL ×<%= x.bol_count %></a><% } else { %><span class="muted">—</span><% } %></td>
+      <td class="muted"><%= x.notes ? x.notes.slice(0, 60) : '' %></td></tr>
     <% }) %>
   </table>
   </div>

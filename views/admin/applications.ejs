@@ -1,0 +1,30 @@
+<% const title = 'Job applications'; %>
+<h1>Job applications</h1>
+<% if (msg === 'updated') { %><p class="alert ok">Status updated.</p><% } %>
+<% if (msg === 'deleted') { %><p class="alert ok">Application deleted.</p><% } %>
+<div class="card">
+  <% if (!apps.length) { %>
+    <p class="muted">No applications yet. The public form lives at <a href="/apply">/apply</a>.</p>
+  <% } else { %>
+  <table class="grid">
+    <tr><th>Name</th><th>Applied</th><th>CDL</th><th class="num">Exp. (yrs)</th><th>Phone</th><th class="num">Docs</th><th>Status</th><th></th></tr>
+    <% apps.forEach((a) => { %>
+      <tr>
+        <td><strong><%= a.full_name %></strong><br><span class="muted" style="font-size:.8rem"><%= a.email %></span></td>
+        <td><%= fmtDateTime(a.created_at) %></td>
+        <td>Class <%= a.cdl_class %><%= a.endorsements ? ' · ' + a.endorsements : '' %></td>
+        <td class="num"><%= a.years_experience === null ? '—' : Number(a.years_experience) %></td>
+        <td><%= a.phone %></td>
+        <td class="num"><%= a.doc_count %></td>
+        <td>
+          <% if (a.status === 'new') { %><span class="badge">new</span>
+          <% } else if (a.status === 'reviewed') { %><span class="badge" style="background:#e8f1fb;color:#1d4e89">reviewed</span>
+          <% } else if (a.status === 'hired') { %><span class="badge" style="background:#e6f4ea;color:#1e7e34">hired</span>
+          <% } else { %><span class="badge off">declined</span><% } %>
+        </td>
+        <td><a class="btn btn-sm" href="/admin/applications/<%= a.id %>">Open</a></td>
+      </tr>
+    <% }) %>
+  </table>
+  <% } %>
+</div>

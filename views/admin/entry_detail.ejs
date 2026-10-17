@@ -1,0 +1,39 @@
+<% const title = 'Fill #' + x.id; %>
+<h1>Fill #<%= x.id %></h1>
+<p class="muted"><%= fmtDateTime(x.filled_at) %> · logged by <%= x.driver_name %></p>
+
+<div class="card">
+  <h2 style="margin-top:0">Details</h2>
+  <p><strong>Customer:</strong> <%= x.customer_name %><br>
+     <strong>Site:</strong> <%= x.site_name || '—' %><br>
+     <strong>Equipment:</strong> <%= x.equipment_label %><br>
+     <strong>Fuel:</strong> <%= x.fuel_type %><br>
+     <strong>Gallons:</strong> <%= fmtGal(x.gallons) %><br>
+     <strong>Notes:</strong> <%= x.notes || '—' %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">BOL photos</h2>
+  <% if (!docs.length) { %>
+    <p class="muted">No BOL photos attached to this fill.</p>
+  <% } else { %>
+    <div style="display:flex;flex-wrap:wrap;gap:1rem">
+      <% docs.forEach((d) => { const url = '/admin/entries/' + x.id + '/documents/' + d.id; %>
+        <figure style="margin:0;width:200px">
+          <a href="<%= url %>" target="_blank" rel="noopener">
+            <img src="<%= url %>" alt="BOL photo"
+                 style="width:200px;height:140px;object-fit:cover;border:1px solid var(--line);border-radius:8px;background:#f5f5f5">
+          </a>
+          <figcaption style="font-size:.8rem;margin-top:.3rem">
+            <strong>BOL photo</strong><br>
+            <span class="muted"><%= (d.size_bytes / 1024).toFixed(0) %> KB</span> ·
+            <a href="<%= url %>" target="_blank" rel="noopener">View</a> ·
+            <a href="<%= url %>?download=1">Download</a>
+          </figcaption>
+        </figure>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<p><a href="/admin/entries">← Back to entry log</a></p>

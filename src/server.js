@@ -64,6 +64,8 @@ app.use((req, res, next) => {
 app.get('/healthz', (req, res) => res.send('ok'));
 
 app.use('/', require('./routes/auth'));
+app.use('/apply', require('./routes/apply'));
+app.use('/hire', require('./routes/hire'));
 app.use('/driver', require('./routes/driver'));
 app.use('/admin', require('./routes/admin'));
 app.use('/admin/ledger', require('./routes/ledger'));

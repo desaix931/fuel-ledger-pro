@@ -61,7 +61,8 @@ router.get('/entries', async (req, res) => {
 
   const [fills, totals, customers, drivers, sites] = await Promise.all([
     pool.query(
-      `SELECT f.*, c.name AS customer_name, s.name AS site_name, u.name AS driver_name
+      `SELECT f.*, c.name AS customer_name, s.name AS site_name, u.name AS driver_name,
+              (SELECT COUNT(*) FROM fill_documents d WHERE d.fill_id = f.id) AS bol_count
        FROM fills f JOIN customers c ON c.id = f.customer_id
        LEFT JOIN sites s ON s.id = f.site_id JOIN users u ON u.id = f.driver_id
        ${clause} ORDER BY f.filled_at DESC LIMIT 500`, params),
@@ -72,6 +73,44 @@ router.get('/entries', async (req, res) => {
                 JOIN customers c ON c.id = s.customer_id ORDER BY c.name, s.name`),
   ]);
   res.render('admin/entries', { fills: fills.rows, totals: totals.rows[0], f, customers: customers.rows, drivers: drivers.rows, sites: sites.rows });
+});
+
+// ---------- Entry detail (incl. BOL photos) ----------
+router.get('/entries/:id', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT f.*, c.name AS customer_name, s.name AS site_name, u.name AS driver_name
+     FROM fills f JOIN customers c ON c.id = f.customer_id
+     LEFT JOIN sites s ON s.id = f.site_id JOIN users u ON u.id = f.driver_id
+     WHERE f.id = $1`,
+    [req.params.id]
+  );
+  if (!rows.length) return res.status(404).send('Fill not found.');
+  const docs = await pool.query(
+    `SELECT id, filename, mimetype, size_bytes, created_at
+     FROM fill_documents WHERE fill_id = $1 ORDER BY id`,
+    [req.params.id]
+  );
+  res.render('admin/entry_detail', { x: rows[0], docs: docs.rows });
+});
+
+// Serve a stored BOL photo's bytes. Admin-only (this router requires admin) —
+// never expose these at public URLs.
+router.get('/entries/:fillId/documents/:docId', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT filename, mimetype, size_bytes, data
+     FROM fill_documents WHERE id = $1 AND fill_id = $2`,
+    [req.params.docId, req.params.fillId]
+  );
+  if (!rows.length) return res.status(404).send('Document not found.');
+  const d = rows[0];
+  res.set('Content-Type', d.mimetype);
+  res.set('Content-Length', String(d.size_bytes));
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.query.download === '1') {
+    const safe = String(d.filename).replace(/["\r\n]/g, '');
+    res.set('Content-Disposition', `attachment; filename="${safe}"`);
+  }
+  res.send(d.data);
 });
 
 // ---------- Users ----------
@@ -391,6 +430,98 @@ router.post('/settings', requireCsrf, async (req, res) => {
     );
   }
   res.redirect('/admin/settings?saved=1');
+});
+
+// ---------- Job applications ----------
+router.get('/applications', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT ja.id, ja.full_name, ja.email, ja.phone, ja.cdl_class, ja.endorsements,
+            ja.years_experience, ja.status, ja.created_at,
+            (SELECT COUNT(*) FROM application_documents d WHERE d.application_id = ja.id) AS doc_count
+     FROM job_applications ja ORDER BY ja.created_at DESC LIMIT 500`);
+  res.render('admin/applications', { apps: rows, msg: req.query.msg || null });
+});
+
+router.get('/applications/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM job_applications WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).send('Application not found.');
+  const docs = await pool.query(
+    `SELECT id, doc_type, filename, mimetype, size_bytes, created_at
+     FROM application_documents WHERE application_id = $1 ORDER BY id`,
+    [req.params.id]
+  );
+  const dotpkg = await pool.query(
+    `SELECT id, full_name, match_status, status, created_at
+     FROM dot_packages WHERE matched_application_id = $1 ORDER BY created_at DESC`,
+    [req.params.id]
+  );
+  res.render('admin/application_detail', { a: rows[0], docs: docs.rows, dotpkgs: dotpkg.rows });
+});
+
+// Serve a stored document's bytes. Admin-only (this router requires admin) —
+// never expose these at public URLs; driver's licenses are sensitive PII.
+router.get('/applications/:appId/documents/:docId', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT filename, mimetype, size_bytes, data
+     FROM application_documents WHERE id = $1 AND application_id = $2`,
+    [req.params.docId, req.params.appId]
+  );
+  if (!rows.length) return res.status(404).send('Document not found.');
+  const d = rows[0];
+  res.set('Content-Type', d.mimetype);
+  res.set('Content-Length', String(d.size_bytes));
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.query.download === '1') {
+    const safe = String(d.filename).replace(/["\r\n]/g, '');
+    res.set('Content-Disposition', `attachment; filename="${safe}"`);
+  }
+  res.send(d.data);
+});
+
+router.post('/applications/:id/status', requireCsrf, async (req, res) => {
+  const ok = ['new', 'reviewed', 'hired', 'declined'];
+  if (!ok.includes(req.body.status)) return res.status(400).send('Invalid status.');
+  await pool.query('UPDATE job_applications SET status = $1 WHERE id = $2', [req.body.status, req.params.id]);
+  res.redirect('/admin/applications?msg=updated');
+});
+
+router.post('/applications/:id/delete', requireCsrf, async (req, res) => {
+  await pool.query('DELETE FROM job_applications WHERE id = $1', [req.params.id]);
+  res.redirect('/admin/applications?msg=deleted');
+});
+
+// ---------- DOT compliance hiring packages ----------
+
+router.get('/dot-packages', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT dp.*,
+            (SELECT full_name FROM job_applications ja WHERE ja.id = dp.matched_application_id) AS app_name
+     FROM dot_packages dp ORDER BY dp.created_at DESC LIMIT 500`);
+  res.render('admin/dot_packages', { pkgs: rows, msg: req.query.msg || null });
+});
+
+router.get('/dot-packages/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM dot_packages WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).send('Package not found.');
+  const p = rows[0];
+  let app = null;
+  if (p.matched_application_id) {
+    const a = await pool.query('SELECT id, full_name, email FROM job_applications WHERE id = $1', [p.matched_application_id]);
+    app = a.rows[0] || null;
+  }
+  res.render('admin/dot_package_detail', { p, app });
+});
+
+router.post('/dot-packages/:id/status', requireCsrf, async (req, res) => {
+  const ok = ['pending', 'reviewed', 'filed'];
+  if (!ok.includes(req.body.status)) return res.status(400).send('Invalid status.');
+  await pool.query('UPDATE dot_packages SET status = $1 WHERE id = $2', [req.body.status, req.params.id]);
+  res.redirect('/admin/dot-packages?msg=updated');
+});
+
+router.post('/dot-packages/:id/delete', requireCsrf, async (req, res) => {
+  await pool.query('DELETE FROM dot_packages WHERE id = $1', [req.params.id]);
+  res.redirect('/admin/dot-packages?msg=deleted');
 });
 
 module.exports = router;

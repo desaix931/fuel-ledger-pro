@@ -5,10 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><%= typeof title !== 'undefined' ? title + ' — ' : '' %>Fuel Ledger Pro</title>
 <link rel="stylesheet" href="/style.css">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#c8102e">
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="/">⛽ Fuel Ledger Pro</a>
+  <a class="brand" href="/"><img src="/logo.png" alt="Desaix Transport" class="brand-logo"> Fuel Ledger</a>
   <% if (user) { %>
   <nav>
     <% if (user.role === 'driver') { %>
@@ -21,6 +25,8 @@
       <a href="/admin/entries">Entries</a>
       <a href="/admin/ledger">Ledger</a>
       <a href="/admin/dispatch">Dispatch</a>
+      <a href="/admin/applications">Applications</a>
+      <a href="/admin/dot-packages">DOT Packages</a>
       <a href="/admin/customers">Customers</a>
       <a href="/admin/import">Import</a>
       <a href="/admin/settings">Settings</a>

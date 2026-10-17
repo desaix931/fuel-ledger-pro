@@ -10,11 +10,20 @@ All timestamps are the business's local time.
 
 ## Roles
 
-- **Driver** — log fills (mobile-first form), view/edit own recent fills, see "My schedule".
+- **Driver** — log fills (mobile-first form, incl. optional BOL photos), view/edit own recent fills, see "My schedule".
 - **Admin (office)** — everything: dashboard, full entry log with filters,
   customer/site/equipment management, user management, dispatch scheduling,
   ledger builder (PDF / CSV / copy-as-text / **email to multiple recipients**),
   billing CSV export, CSV import.
+
+## BOL photos on fills
+
+When logging a fill, a driver can snap up to 3 photos of the bill of lading —
+the phone camera opens directly, and photos are resized on-device before
+uploading. Photos are stored as bytea in Postgres (survive Render restarts),
+validated server-side (JPEG/PNG/WebP magic bytes, 8 MB max each). The office
+sees a "BOL ×n" badge in the entry log and on ledgers, and can view/download
+the photos from the fill's detail page (admin-only URLs).
 
 ## Run locally
 
@@ -123,6 +132,107 @@ date,customer,site,equipment,fuel_type,gallons,driver,notes
 - `driver`: matched by email or name to an existing driver; unmatched rows
   use the default driver you pick on the import page
 - `gallons`: positive number
+
+## CDL driver job application (`/apply`)
+
+A public, mobile-friendly job-application form lives at `/apply` — no login
+needed. Drivers apply from their phones; every submission is saved to the
+`job_applications` table and the office is emailed (see below). The office
+reviews applications under **Admin → Applications** (status: new → reviewed
+→ hired / declined).
+
+**Document photos:** the form collects photos of the driver's license (front
+and back, required), the DOT medical examiner's certificate (required), and
+up to 3 additional documents (optional). On phones the file inputs open the
+camera directly. Photos are compressed in the browser before sending (max
+1600px on the long edge, JPEG ~0.8 quality). Files are stored as `bytea` in
+the `application_documents` table in Postgres — never on the container's
+disk, so they survive restarts and redeploys. The office views and downloads
+them from the application detail page; document URLs are admin-only and never
+public. Server-side rules: JPEG/PNG/WebP only (magic bytes are checked, not
+just the claimed type), 8 MB max per file.
+
+**Notification email:** when a driver applies, the office gets an email if
+SMTP is configured (see "Email setup"). The recipient is `APPLY_NOTIFY_EMAIL`
+when set, otherwise the company email from Admin → Settings. If email isn't
+configured, the application is still saved and flagged in the inbox — an
+application is never lost because email failed.
+
+Spam protection: a honeypot field plus per-IP rate limiting (10/hour).
+
+### Embed the form on the company website
+
+This replaces the Google Forms "Driver app" link on desaixtransportllc.com.
+The form is designed to sit inside an iframe:
+
+```html
+<iframe src="https://app.yourdomain.com/apply"
+        title="CDL Driver Job Application — Desaix Transport"
+        style="width:100%;height:2300px;border:0;"
+        loading="lazy"></iframe>
+```
+
+Swap `app.yourdomain.com` for your real subdomain, and raise `height` if the
+form ever grows (the page itself is responsive, so it works on phones and
+desktops alike).
+
+**GoDaddy Website Builder — 3 steps:**
+
+1. In the page editor, click **Add** (or the + between sections) → **HTML** /
+   **Embed HTML** block.
+2. Paste the snippet above into the **Custom Code** field.
+3. Publish — applicants apply right on your site and the office gets emailed.
+
+## DOT compliance hiring package (`/hire/package`)
+
+A **separate** public form for the post-application, pre-hire FMCSA driver
+qualification paperwork — the prospective driver fills this out after applying
+(it is not part of `/apply`). Mobile-friendly, no login needed.
+
+**What it collects:**
+- **A. Link to application** — name, email, DOB. The server soft-matches to a
+  `job_applications` row by email (+ name/DOB sanity check). If nothing
+  matches, the package is still saved with `match_status='unmatched'` for
+  office review — a package is never lost because the driver typo'd an email.
+- **B. Safety performance history release (49 CFR 391.23)** — every
+  DOT-regulated employer from the past 3 years (up to 5), with contact info,
+  plus a typed signature authorizing Desaix Transport LLC to obtain the
+  safety history.
+- **C. Drug & alcohol testing history (49 CFR Part 382 / §40.25)** — yes/no on
+  positives or refusals in the past 2 years, with details + SAP status if yes.
+- **D. FMCSA Clearinghouse acknowledgment** — required checkbox: the carrier
+  runs a full pre-employment Clearinghouse query; the driver must register and
+  provide electronic consent.
+- **E. Medical certification details** — examiner name, National Registry
+  number, issue/expiry dates (the card photo is already on file from the
+  application).
+- **F. Driver's certification of violations (49 CFR 391.27)** — all
+  non-parking violations in the past 12 months, or a "no violations" check,
+  with typed signature + date.
+- **G. Road test acknowledgment (49 CFR 391.33)** — required checkbox: the
+  valid CDL is accepted in lieu of a road test.
+
+**Office side:** submissions are emailed (same `APPLY_NOTIFY_EMAIL` fallback
+chain as applications; a package is never lost if email fails) and appear
+under **Admin → DOT Packages** (list shows matched/unmatched, status workflow
+pending → reviewed → filed). When a package matches an application, the
+application detail page shows a **"DOT hiring package"** card linking to it.
+
+Spam protection: honeypot + per-IP rate limiting (10/hour).
+
+**Embed on the company website** (separate from the application embed):
+
+```html
+<iframe src="https://app.yourdomain.com/hire/package"
+        title="DOT Compliance Hiring Package — Desaix Transport"
+        style="width:100%;height:2600px;border:0;"
+        loading="lazy"></iframe>
+```
+
+Same 3 GoDaddy steps as the application form. This form collects the driver's
+portions — the office still runs the MVR, Clearinghouse queries,
+previous-employer inquiries, and pre-employment drug test itself. Operational
+info, not legal advice.
 
 ## Security notes
 

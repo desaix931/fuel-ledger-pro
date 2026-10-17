@@ -41,6 +41,11 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # --- Job applications -------------------------------------------------
+      # Who gets emailed when a driver submits the public /apply form.
+      # Defaults to the company email from Admin > Settings when empty.
+      - key: APPLY_NOTIFY_EMAIL
+        sync: false
 
 databases:
   - name: fuel-ledger-db

@@ -1,0 +1,227 @@
+<% const title = 'CDL Driver Application'; %>
+<h1>CDL Driver Application</h1>
+<p class="muted">Desaix Transport LLC · 207 Livingston Rd, Crossville, TN 38555 · (931) 707-5172 — fill this out on your phone, it takes a few minutes.</p>
+<% if (errors && errors.length) { %><div class="alert err"><% errors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
+
+<form method="post" action="/apply" id="applyform" enctype="multipart/form-data">
+  <!-- honeypot: real applicants never see or fill this -->
+  <div style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Contact information</h2>
+    <label>Full name <input type="text" name="full_name" required maxlength="120" autocomplete="name" value="<%= values.full_name %>"></label>
+    <div class="filters">
+      <label>Phone <input type="tel" name="phone" required maxlength="40" autocomplete="tel" value="<%= values.phone %>"></label>
+      <label>Email <input type="email" name="email" required maxlength="160" autocomplete="email" value="<%= values.email %>"></label>
+    </div>
+    <label>Street address <input type="text" name="street" required maxlength="200" autocomplete="street-address" value="<%= values.street %>"></label>
+    <div class="filters">
+      <label>City <input type="text" name="city" required maxlength="100" autocomplete="address-level2" value="<%= values.city %>"></label>
+      <label>State <input type="text" name="state" required maxlength="60" autocomplete="address-level1" value="<%= values.state %>"></label>
+      <label>ZIP <input type="text" name="zip" maxlength="20" inputmode="numeric" autocomplete="postal-code" value="<%= values.zip %>"></label>
+    </div>
+    <div class="filters">
+      <label>Date of birth <input type="date" name="dob" required value="<%= values.dob %>"></label>
+      <label>Social Security number <span class="muted" style="font-weight:400;font-size:.85rem">(required by DOT — kept in the office system only)</span>
+        <input type="text" name="ssn" required inputmode="numeric" maxlength="11" placeholder="123-45-6789" autocomplete="off" value="<%= values.ssn %>"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Addresses — where you've lived in the last 3 years</h2>
+    <p class="muted" style="font-size:.9rem">DOT requires <strong>every</strong> address where you've lived in the last 3 years. Your current address above counts as the first — add any previous ones.</p>
+    <% values.prev_addresses.forEach((pa, i) => { const n = i + 1; %>
+      <div data-addrblock style="<%= (i > 0 && !pa.street) ? 'display:none;' : '' %>border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+        <h3 style="margin:.2rem 0 .5rem">Previous address <%= n %></h3>
+        <label>Street <input type="text" name="pa<%= n %>_street" maxlength="200" value="<%= pa.street %>"></label>
+        <div class="filters">
+          <label>City <input type="text" name="pa<%= n %>_city" maxlength="100" value="<%= pa.city %>"></label>
+          <label>State <input type="text" name="pa<%= n %>_state" maxlength="60" value="<%= pa.state %>"></label>
+          <label>ZIP <input type="text" name="pa<%= n %>_zip" maxlength="20" inputmode="numeric" value="<%= pa.zip %>"></label>
+        </div>
+        <label>Dates lived there (e.g. 2022 – 2024) <input type="text" name="pa<%= n %>_dates" maxlength="80" value="<%= pa.dates %>"></label>
+      </div>
+    <% }); %>
+    <button type="button" class="btn btn-sm" id="addaddress">+ Add another address</button>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">CDL &amp; experience</h2>
+    <div class="filters">
+      <label>CDL class
+        <select name="cdl_class" required>
+          <option value="">— select —</option>
+          <% ['A','B','C'].forEach((c) => { %>
+            <option value="<%= c %>" <%= values.cdl_class === c ? 'selected' : '' %>>Class <%= c %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>Years of CDL driving experience
+        <input type="number" name="years_experience" required min="0" max="60" step="0.5" inputmode="decimal" value="<%= values.years_experience %>">
+      </label>
+    </div>
+    <div class="filters">
+      <label>Issuing state <input type="text" name="cdl_state" required maxlength="2" placeholder="TN" style="text-transform:uppercase" value="<%= values.cdl_state %>"></label>
+      <label>CDL number <input type="text" name="cdl_number" required maxlength="40" autocomplete="off" value="<%= values.cdl_number %>"></label>
+      <label>Expiration date <input type="date" name="cdl_expiry" required value="<%= values.cdl_expiry %>"></label>
+    </div>
+    <fieldset style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+      <legend style="padding:0 .4rem">Endorsements (check all that apply)</legend>
+      <div class="chips">
+        <% endorsements.forEach((e) => { %>
+          <label class="chip" style="cursor:pointer"><input type="checkbox" name="endorsements" value="<%= e %>" <%= values.endorsements.includes(e) ? 'checked' : '' %> style="width:auto"> <%= e %></label>
+        <% }) %>
+      </div>
+    </fieldset>
+    <fieldset style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+      <legend style="padding:0 .4rem">Equipment you've operated (check all that apply)</legend>
+      <div class="chips">
+        <% equipment_types.forEach((e) => { %>
+          <label class="chip" style="cursor:pointer"><input type="checkbox" name="equipment_types" value="<%= e %>" <%= values.equipment_types.includes(e) ? 'checked' : '' %> style="width:auto"> <%= e %></label>
+        <% }) %>
+      </div>
+    </fieldset>
+    <label>Current employer (if employed) <input type="text" name="current_employer" maxlength="160" value="<%= values.current_employer %>"></label>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Employment history — last 3 years</h2>
+    <p class="muted" style="font-size:.9rem">List <strong>every</strong> employer from the last 3 years, most recent first. DOT requires each employer's address and whether the job was DOT-regulated.</p>
+    <% values.employers.forEach((e, i) => { const n = i + 1; %>
+      <div style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+        <h3 style="margin:.2rem 0 .5rem">Employer <%= n %><%= n === 1 ? ' <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>' : '' %></h3>
+        <label>Company name <input type="text" name="emp<%= n %>_company" <%= n === 1 ? 'required' : '' %> maxlength="160" value="<%= e.company %>"></label>
+        <label>Street address <input type="text" name="emp<%= n %>_street" maxlength="200" value="<%= e.street %>"></label>
+        <div class="filters">
+          <label>City <input type="text" name="emp<%= n %>_city" maxlength="100" value="<%= e.city %>"></label>
+          <label>State <input type="text" name="emp<%= n %>_state" maxlength="60" value="<%= e.state %>"></label>
+          <label>ZIP <input type="text" name="emp<%= n %>_zip" maxlength="20" inputmode="numeric" value="<%= e.zip %>"></label>
+        </div>
+        <label>Dates employed (e.g. 2021 – 2024) <input type="text" name="emp<%= n %>_dates" <%= n === 1 ? 'required' : '' %> maxlength="80" value="<%= e.dates %>"></label>
+        <label>Reason for leaving <input type="text" name="emp<%= n %>_reason" maxlength="500" value="<%= e.reason %>"></label>
+        <p style="margin:.5rem 0"><strong>Were you subject to the Federal Motor Carrier Safety Regulations at this job?</strong><br>
+          <label style="display:inline-block;margin-right:1.2rem"><input type="radio" name="emp<%= n %>_fmcsr" value="yes" style="width:auto" <%= e.fmcsr === 'yes' ? 'checked' : '' %>> Yes</label>
+          <label style="display:inline-block"><input type="radio" name="emp<%= n %>_fmcsr" value="no" style="width:auto" <%= e.fmcsr === 'no' ? 'checked' : '' %>> No</label>
+        </p>
+        <p style="margin:.5rem 0"><strong>Was this a DOT safety-sensitive function (subject to DOT drug &amp; alcohol testing)?</strong><br>
+          <label style="display:inline-block;margin-right:1.2rem"><input type="radio" name="emp<%= n %>_safety" value="yes" style="width:auto" <%= e.safety === 'yes' ? 'checked' : '' %>> Yes</label>
+          <label style="display:inline-block"><input type="radio" name="emp<%= n %>_safety" value="no" style="width:auto" <%= e.safety === 'no' ? 'checked' : '' %>> No</label>
+        </p>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Commercial driving jobs — 4 to 10 years ago</h2>
+    <p class="muted" style="font-size:.9rem">DOT also requires the companies where you operated a commercial motor vehicle during the 7 years <em>before</em> the 3 above. List each one — company, location, dates, and reason for leaving. Leave blank if none.</p>
+    <% values.cmv_history.forEach((c, i) => { const n = i + 1; %>
+      <div data-cmvblock style="<%= (i > 0 && !c.company) ? 'display:none;' : '' %>border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
+        <h3 style="margin:.2rem 0 .5rem">Job <%= n %></h3>
+        <label>Company name <input type="text" name="cmv<%= n %>_company" maxlength="160" value="<%= c.company %>"></label>
+        <div class="filters">
+          <label>City <input type="text" name="cmv<%= n %>_city" maxlength="100" value="<%= c.city %>"></label>
+          <label>State <input type="text" name="cmv<%= n %>_state" maxlength="60" value="<%= c.state %>"></label>
+        </div>
+        <label>Dates employed (e.g. 2016 – 2021) <input type="text" name="cmv<%= n %>_dates" maxlength="80" value="<%= c.dates %>"></label>
+        <label>Reason for leaving <input type="text" name="cmv<%= n %>_reason" maxlength="500" value="<%= c.reason %>"></label>
+      </div>
+    <% }); %>
+    <button type="button" class="btn btn-sm" id="addcmv">+ Add another job</button>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Safety record</h2>
+    <% const q = (name, label, detailName) => { %>
+      <fieldset style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0" data-yn="<%= name %>">
+        <legend style="padding:0 .4rem"><%= label %></legend>
+        <label style="display:inline-block;margin-right:1.2rem"><input type="radio" name="<%= name %>" value="yes" style="width:auto" <%= values[name] === 'yes' ? 'checked' : '' %>> Yes</label>
+        <label style="display:inline-block"><input type="radio" name="<%= name %>" value="no" style="width:auto" <%= values[name] === 'no' ? 'checked' : '' %>> No</label>
+        <div data-detail style="display:<%= values[name] === 'yes' ? 'block' : 'none' %>;margin-top:.5rem">
+          <label>Details <textarea name="<%= detailName %>" maxlength="2000" placeholder="What happened, when, and the outcome."><%= values[detailName] %></textarea></label>
+        </div>
+      </fieldset>
+    <% }; %>
+    <% q('accidents_3yr', 'Any accidents in the last 3 years?', 'accidents_details'); %>
+    <p class="muted" style="font-size:.85rem;margin:-.3rem 0 .8rem">For each accident, list: the date, what happened, and whether anyone was killed or injured.</p>
+    <% q('violations_3yr', 'Any traffic violations (convictions or forfeited bond/collateral, other than parking) in the last 3 years?', 'violations_details'); %>
+    <% q('license_suspended', 'Has your license ever been suspended or revoked?', 'license_suspended_details'); %>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Eligibility</h2>
+    <% const yn = (name, label) => { %>
+      <p style="margin:.5rem 0"><strong><%= label %></strong><br>
+        <label style="display:inline-block;margin-right:1.2rem"><input type="radio" name="<%= name %>" value="yes" style="width:auto" <%= values[name] === 'yes' ? 'checked' : '' %>> Yes</label>
+        <label style="display:inline-block"><input type="radio" name="<%= name %>" value="no" style="width:auto" <%= values[name] === 'no' ? 'checked' : '' %>> No</label>
+      </p>
+    <% }; %>
+    <% yn('can_pass_drug_test', 'Can you pass a DOT drug test?'); %>
+    <% yn('twic_holder', 'Do you hold a TWIC card?'); %>
+    <% yn('authorized_to_work', 'Are you authorized to work in the United States?'); %>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Documents — take a photo of each</h2>
+    <p class="muted" style="margin-top:0">On your phone this opens the camera directly. Photos are resized automatically before sending.</p>
+    <label>Driver's license — front <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>
+      <input type="file" name="doc_license_front" accept="image/*" capture="environment" required></label>
+    <label>Driver's license — back <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>
+      <input type="file" name="doc_license_back" accept="image/*" capture="environment" required></label>
+    <label>DOT medical examiner's certificate <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>
+      <input type="file" name="doc_medical_card" accept="image/*" capture="environment" required></label>
+    <label>Additional documents <span class="muted" style="font-weight:400;font-size:.85rem">(optional, up to 3 — e.g. TWIC card, hazmat endorsement)</span>
+      <input type="file" name="doc_other" accept="image/*" multiple></label>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Consent &amp; signature</h2>
+    <label style="display:block;margin:.6rem 0">
+      <input type="checkbox" name="background_consent" value="yes" required style="width:auto" <%= values.background_consent === 'yes' ? 'checked' : '' %>>
+      <strong>I consent to a background check and motor vehicle record (MVR) review as part of this application. *</strong>
+    </label>
+    <label>How did you hear about us? (optional) <input type="text" name="heard_about" maxlength="200" value="<%= values.heard_about %>"></label>
+    <div class="filters">
+      <label>Type your full name as your signature <input type="text" name="signature" required maxlength="120" value="<%= values.signature %>"></label>
+      <label>Date <input type="date" name="signature_date" required value="<%= values.signature_date || '' %>"></label>
+    </div>
+    <p class="muted" style="font-size:.85rem">This certifies that this application was completed by me, and that all entries on it and information in it are true and complete to the best of my knowledge.</p>
+  </div>
+
+  <button class="btn-primary btn-block" type="submit" style="font-size:1.2rem;padding:1rem">Submit application</button>
+</form>
+
+<script src="/js/photo-compress.js"></script>
+<script>
+(function () {
+  // Show the details box when "Yes" is picked on the safety questions.
+  document.querySelectorAll('fieldset[data-yn]').forEach(function (fs) {
+    var detail = fs.querySelector('[data-detail]');
+    fs.addEventListener('change', function () {
+      var yes = fs.querySelector('input[type=radio][value=yes]').checked;
+      detail.style.display = yes ? 'block' : 'none';
+    });
+  });
+
+  // Compress document photos on the phone before sending (shared helper).
+  compressPhotosOnSubmit('applyform');
+
+  // Reveal hidden repeatable blocks (previous addresses, CMV history).
+  function wireAddMore(btnId, blockAttr) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var blocks = document.querySelectorAll('[' + blockAttr + ']');
+      for (var i = 0; i < blocks.length; i++) {
+        if (blocks[i].style.display === 'none') { blocks[i].style.display = ''; break; }
+      }
+      var hidden = 0;
+      blocks.forEach(function (b) { if (b.style.display === 'none') hidden++; });
+      if (!hidden) btn.style.display = 'none';
+    });
+  }
+  wireAddMore('addaddress', 'data-addrblock');
+  wireAddMore('addcmv', 'data-cmvblock');
+})();
+</script>

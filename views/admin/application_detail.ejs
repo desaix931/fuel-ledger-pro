@@ -1,0 +1,152 @@
+<% const title = 'Application — ' + a.full_name; %>
+<h1><%= a.full_name %></h1>
+<p class="muted">Applied <%= fmtDateTime(a.created_at) %>
+  <% if (a.source_ip) { %> · IP <%= a.source_ip %><% } %>
+  · notification email <%= a.email_sent ? 'sent' : 'not sent' %></p>
+
+<div class="card">
+  <form method="post" action="/admin/applications/<%= a.id %>/status" class="inline" style="display:inline">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Status
+      <select name="status">
+        <% [['new','New'],['reviewed','Reviewed'],['hired','Hired'],['declined','Declined']].forEach(([v, l]) => { %>
+          <option value="<%= v %>" <%= a.status === v ? 'selected' : '' %>><%= l %></option>
+        <% }) %>
+      </select>
+    </label>
+    <button class="btn-primary" type="submit">Update status</button>
+  </form>
+  <form method="post" action="/admin/applications/<%= a.id %>/delete" class="inline" style="display:inline;margin-left:1rem"
+        onsubmit="return confirm('Delete this application permanently?')">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn-danger" type="submit">Delete</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">DOT hiring package</h2>
+  <% if (!dotpkgs.length) { %>
+    <p class="muted">No hiring package submitted yet. The public form lives at <a href="/hire/package">/hire/package</a>.</p>
+  <% } else { %>
+    <% dotpkgs.forEach((d) => { %>
+      <p><strong><%= fmtDateTime(d.created_at) %></strong>
+        <% if (d.status === 'pending') { %><span class="badge">pending</span>
+        <% } else if (d.status === 'reviewed') { %><span class="badge" style="background:#e8f1fb;color:#1d4e89">reviewed</span>
+        <% } else { %><span class="badge" style="background:#e6f4ea;color:#1e7e34">filed</span><% } %>
+        <a class="btn btn-sm" href="/admin/dot-packages/<%= d.id %>" style="margin-left:.5rem">Open package</a></p>
+    <% }) %>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Documents</h2>
+  <% if (!docs.length) { %>
+    <p class="muted">No documents attached.</p>
+  <% } else { %>
+    <% const DOC_NAMES = { license_front: "Driver's license — front", license_back: "Driver's license — back", medical_card: "DOT medical certificate", other: "Additional document" }; %>
+    <div style="display:flex;flex-wrap:wrap;gap:1rem">
+      <% docs.forEach((d) => { const url = '/admin/applications/' + a.id + '/documents/' + d.id; %>
+        <figure style="margin:0;width:200px">
+          <a href="<%= url %>" target="_blank" rel="noopener">
+            <img src="<%= url %>" alt="<%= DOC_NAMES[d.doc_type] || d.doc_type %>"
+                 style="width:200px;height:140px;object-fit:cover;border:1px solid var(--line);border-radius:8px;background:#f5f5f5">
+          </a>
+          <figcaption style="font-size:.8rem;margin-top:.3rem">
+            <strong><%= DOC_NAMES[d.doc_type] || d.doc_type %></strong><br>
+            <span class="muted"><%= (d.size_bytes / 1024).toFixed(0) %> KB</span> ·
+            <a href="<%= url %>" target="_blank" rel="noopener">View</a> ·
+            <a href="<%= url %>?download=1">Download</a>
+          </figcaption>
+        </figure>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Contact</h2>
+  <p><strong>Phone:</strong> <%= a.phone %><br>
+     <strong>Email:</strong> <%= a.email %><br>
+     <strong>Address:</strong> <%= [a.street, a.city, a.state, a.zip].filter(Boolean).join(', ') || '—' %><br>
+     <strong>DOB:</strong> <%= a.dob ? fmtDate(a.dob) : '—' %><br>
+     <strong>SSN:</strong> <%= a.ssn || '—' %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Addresses — last 3 years</h2>
+  <% const paddrs = a.prev_addresses || []; %>
+  <% if (!paddrs.length) { %>
+    <p class="muted">Current address only — no previous addresses listed.</p>
+  <% } else { %>
+    <% paddrs.forEach((pa) => { %>
+      <p><%= [pa.street, pa.city, [pa.state, pa.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') %>
+      <% if (pa.dates) { %> <span class="muted">(<%= pa.dates %>)</span><% } %></p>
+    <% }) %>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">CDL &amp; experience</h2>
+  <p><strong>Class:</strong> <%= a.cdl_class %><br>
+     <strong>Issuing state:</strong> <%= a.cdl_state || '—' %><br>
+     <strong>CDL number:</strong> <%= a.cdl_number || '—' %><br>
+     <strong>Expiration:</strong> <%= a.cdl_expiry ? fmtDate(a.cdl_expiry) : '—' %><br>
+     <strong>Endorsements:</strong> <%= a.endorsements || 'none' %><br>
+     <strong>Equipment operated:</strong> <%= a.equipment_types || '—' %><br>
+     <strong>Experience:</strong> <%= a.years_experience === null ? '—' : Number(a.years_experience) + ' years' %><br>
+     <strong>Current employer:</strong> <%= a.current_employer || '—' %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Employment history — last 3 years</h2>
+  <% const emps = (a.employers && a.employers.length) ? a.employers
+      : [1,2,3].map((n) => ({ company: a['emp'+n+'_company'], dates: a['emp'+n+'_dates'], reason: a['emp'+n+'_reason'] })).filter((e) => e.company); %>
+  <% if (!emps.length) { %>
+    <p class="muted">None listed.</p>
+  <% } %>
+  <% emps.forEach((e) => { %>
+    <p><strong><%= e.company %></strong> <span class="muted">(<%= e.dates || 'dates not given' %>)</span><br>
+    <% const eaddr = [e.street, e.city, [e.state, e.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '); %>
+    <% if (eaddr) { %><span class="muted">Address:</span> <%= eaddr %><br><% } %>
+    <span class="muted">Reason for leaving:</span> <%= e.reason || '—' %>
+    <% if (e.fmcsr) { %><br><span class="muted">Subject to FMCSRs:</span> <%= e.fmcsr === 'yes' ? 'Yes' : 'No' %><% } %>
+    <% if (e.safety) { %><br><span class="muted">DOT safety-sensitive function:</span> <%= e.safety === 'yes' ? 'Yes' : 'No' %><% } %>
+    </p>
+  <% }) %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Commercial driving jobs — 4 to 10 years ago</h2>
+  <% const cmvh = a.cmv_history || []; %>
+  <% if (!cmvh.length) { %>
+    <p class="muted">None listed.</p>
+  <% } %>
+  <% cmvh.forEach((c) => { %>
+    <p><strong><%= c.company %></strong> <span class="muted">(<%= c.dates || 'dates not given' %>)</span><br>
+    <% const caddr = [c.city, c.state].filter(Boolean).join(', '); %>
+    <% if (caddr) { %><span class="muted">Location:</span> <%= caddr %><br><% } %>
+    <span class="muted">Reason for leaving:</span> <%= c.reason || '—' %></p>
+  <% }) %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Safety record</h2>
+  <p><strong>Accidents (3 yrs):</strong> <%= a.accidents_3yr ? 'YES' : 'No' %>
+    <% if (a.accidents_details) { %><br><span class="muted">Details:</span> <%= a.accidents_details %><% } %></p>
+  <p><strong>Violations (3 yrs):</strong> <%= a.violations_3yr ? 'YES' : 'No' %>
+    <% if (a.violations_details) { %><br><span class="muted">Details:</span> <%= a.violations_details %><% } %></p>
+  <p><strong>License suspended/revoked:</strong> <%= a.license_suspended ? 'YES' : 'No' %>
+    <% if (a.license_suspended_details) { %><br><span class="muted">Details:</span> <%= a.license_suspended_details %><% } %></p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Eligibility</h2>
+  <p><strong>Can pass DOT drug test:</strong> <%= a.can_pass_drug_test === null ? '—' : (a.can_pass_drug_test ? 'Yes' : 'No') %><br>
+     <strong>TWIC holder:</strong> <%= a.twic_holder === null ? '—' : (a.twic_holder ? 'Yes' : 'No') %><br>
+     <strong>Authorized to work in US:</strong> <%= a.authorized_to_work === null ? '—' : (a.authorized_to_work ? 'Yes' : 'No') %><br>
+     <strong>Background/MVR consent:</strong> <%= a.background_consent ? 'YES' : 'No' %></p>
+  <p><strong>Heard about us:</strong> <%= a.heard_about || '—' %></p>
+  <p><strong>Signed:</strong> <%= a.signature %> on <%= a.signature_date ? fmtDate(a.signature_date) : '—' %></p>
+</div>
+
+<p><a href="/admin/applications">← Back to applications</a></p>

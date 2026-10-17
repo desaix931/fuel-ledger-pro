@@ -24,7 +24,8 @@ async function ledgerData(customerId, from, to) {
   const [cust, fills, totals] = await Promise.all([
     pool.query('SELECT * FROM customers WHERE id = $1', [customerId]),
     pool.query(
-      `SELECT f.*, s.name AS site_name, u.name AS driver_name
+      `SELECT f.*, s.name AS site_name, u.name AS driver_name,
+              (SELECT COUNT(*) FROM fill_documents d WHERE d.fill_id = f.id) AS bol_count
        FROM fills f LEFT JOIN sites s ON s.id = f.site_id JOIN users u ON u.id = f.driver_id
        ${clause} ORDER BY f.filled_at`, params),
     pool.query(

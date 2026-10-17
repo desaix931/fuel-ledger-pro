@@ -1,0 +1,27 @@
+<% const title = 'DOT hiring packages'; %>
+<h1>DOT hiring packages</h1>
+<% if (msg === 'updated') { %><p class="alert ok">Status updated.</p><% } %>
+<% if (msg === 'deleted') { %><p class="alert ok">Package deleted.</p><% } %>
+<div class="card">
+  <% if (!pkgs.length) { %><p class="muted">No hiring packages yet. The public form lives at <a href="/hire/package">/hire/package</a>.</p><% } else { %>
+  <table class="grid">
+    <tr><th>Name</th><th>Submitted</th><th>Application match</th><th>Status</th><th></th></tr>
+    <% pkgs.forEach((p) => { %>
+      <tr>
+        <td><strong><%= p.full_name %></strong><br><span class="muted" style="font-size:.8rem"><%= p.email %></span></td>
+        <td><%= fmtDateTime(p.created_at) %></td>
+        <td>
+          <% if (p.match_status === 'matched') { %><span class="badge" style="background:#e6f4ea;color:#1e7e34">matched</span><% if (p.app_name) { %><br><span class="muted" style="font-size:.8rem"><%= p.app_name %></span><% } %>
+          <% } else { %><span class="badge" style="background:#fdf0e4;color:#9a5b00">unmatched</span><% } %>
+        </td>
+        <td>
+          <% if (p.status === 'pending') { %><span class="badge">pending</span>
+          <% } else if (p.status === 'reviewed') { %><span class="badge" style="background:#e8f1fb;color:#1d4e89">reviewed</span>
+          <% } else { %><span class="badge" style="background:#e6f4ea;color:#1e7e34">filed</span><% } %>
+        </td>
+        <td><a class="btn btn-sm" href="/admin/dot-packages/<%= p.id %>">Open</a></td>
+      </tr>
+    <% }) %>
+  </table>
+  <% } %>
+</div>

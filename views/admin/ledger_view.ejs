@@ -46,10 +46,11 @@
   <strong>Period:</strong> <%= data.from || 'beginning' %> to <%= data.to || 'today' %></p>
   <div style="overflow-x:auto">
   <table class="grid">
-    <tr><th>Date</th><th>Site</th><th>Equipment</th><th>Fuel type</th><th class="num">Gallons</th><th>Driver</th></tr>
+    <tr><th>Date</th><th>Site</th><th>Equipment</th><th>Fuel type</th><th class="num">Gallons</th><th>Driver</th><th>BOL</th></tr>
     <% data.fills.forEach((f) => { %>
       <tr><td><%= fmtDateTime(f.filled_at) %></td><td><%= f.site_name || '—' %></td><td><%= f.equipment_label %></td>
-      <td><%= f.fuel_type %></td><td class="num"><%= fmtGal(f.gallons) %></td><td><%= f.driver_name %></td></tr>
+      <td><%= f.fuel_type %></td><td class="num"><%= fmtGal(f.gallons) %></td><td><%= f.driver_name %></td>
+      <td><% if (Number(f.bol_count) > 0) { %><a href="/admin/entries/<%= f.id %>">BOL ×<%= f.bol_count %></a><% } else { %><span class="muted">—</span><% } %></td></tr>
     <% }) %>
   </table>
   </div>
