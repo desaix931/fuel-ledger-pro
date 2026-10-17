@@ -111,3 +111,27 @@ function validateFill(body) {
 }
 
 module.exports = { bolUploadFields, validateBolDocs, formLookups, validateFill };
+
+// For admins logging a fill on someone's behalf: the "who did this fill"
+// picker. Returns { isAdmin, drivers } for the form view. Drivers get an
+// empty list and no picker.
+async function driverPickerLocals(user) {
+  if (!user || user.role !== 'admin') return { isAdmin: false, drivers: [] };
+  const { rows } = await pool.query(
+    `SELECT id, name, role FROM users WHERE active ORDER BY role, name`);
+  return { isAdmin: true, drivers: rows };
+}
+
+// Resolve which user a fill is attributed to. Drivers can only ever log as
+// themselves (a tampered driver_id in the body is ignored); admins may pick
+// any active user, defaulting to themselves.
+async function resolveFillDriver(user, body) {
+  if (!user || user.role !== 'admin') return user.id;
+  const picked = parseInt(body && body.driver_id, 10);
+  if (!picked) return user.id;
+  const { rows } = await pool.query('SELECT id FROM users WHERE id = $1 AND active', [picked]);
+  return rows.length ? picked : user.id;
+}
+
+module.exports.driverPickerLocals = driverPickerLocals;
+module.exports.resolveFillDriver = resolveFillDriver;

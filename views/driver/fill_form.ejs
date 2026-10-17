@@ -5,6 +5,18 @@
 <form method="post" action="<%= formAction %>" id="fillform" enctype="multipart/form-data">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
+  <% if (isAdmin && drivers && drivers.length) { %>
+  <div class="card">
+    <label>Driver — who performed this fill
+      <select name="driver_id" required>
+        <% drivers.forEach((d) => { %>
+          <option value="<%= d.id %>" <%= String(form.driver_id || user.id) === String(d.id) ? 'selected' : '' %>><%= d.name %> · <%= d.role %></option>
+        <% }) %>
+      </select>
+    </label>
+  </div>
+  <% } %>
+
   <div class="card">
     <label>Customer
       <select name="customer_id" id="customer" required>

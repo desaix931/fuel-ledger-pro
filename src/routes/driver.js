@@ -3,7 +3,7 @@ const express = require('express');
 const pool = require('../db');
 const { requireLogin, requireCsrf } = require('../middleware');
 const { FUEL_TYPES, toInputDateTime, todayStr } = require('../lib');
-const { bolUploadFields, validateBolDocs, formLookups, validateFill } = require('../fillForm');
+const { bolUploadFields, validateBolDocs, formLookups, validateFill, driverPickerLocals, resolveFillDriver } = require('../fillForm');
 
 // View chrome for the shared fill form (driver URLs). Admins (managers who
 // also drive) can use the same form; their cancel/save lands back in the
@@ -85,7 +85,7 @@ router.get('/fills/new', async (req, res) => {
   const lookups = await formLookups();
   res.render('driver/fill_form', {
     lookups, errors: [], form: { filled_at: toInputDateTime(new Date()) }, editing: null,
-    ...driverChrome(null, res.locals.user),
+    ...driverChrome(null, res.locals.user), ...(await driverPickerLocals(res.locals.user)),
   });
 });
 
@@ -95,24 +95,23 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
     ? { errors: [req.bolUploadError], docs: [] }
     : validateBolDocs(req.files);
   const allErrors = errors.concat(docErrors);
-  if (allErrors.length) {
+  const picker = await driverPickerLocals(res.locals.user);
+  const renderForm = async (errs) => {
     const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: null, ...driverChrome(null, res.locals.user) });
-  }
+    return res.status(400).render('driver/fill_form', { lookups, errors: errs, form: req.body, editing: null, ...driverChrome(null, res.locals.user), ...picker });
+  };
+  if (allErrors.length) return renderForm(allErrors);
   // Verify customer/site exist and are active (and site belongs to customer).
   const cust = await pool.query('SELECT id FROM customers WHERE id = $1 AND active', [data.customerId]);
-  if (!cust.rows.length) {
-    const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors: ['Unknown customer.'], form: req.body, editing: null, ...driverChrome(null, res.locals.user) });
-  }
+  if (!cust.rows.length) return renderForm(['Unknown customer.']);
   if (data.siteId) {
     const site = await pool.query(
       'SELECT id FROM sites WHERE id = $1 AND customer_id = $2 AND active', [data.siteId, data.customerId]);
-    if (!site.rows.length) {
-      const lookups = await formLookups();
-      return res.status(400).render('driver/fill_form', { lookups, errors: ['That site does not belong to the chosen customer.'], form: req.body, editing: null, ...driverChrome(null, res.locals.user) });
-    }
+    if (!site.rows.length) return renderForm(['That site does not belong to the chosen customer.']);
   }
+  // Who the fill is attributed to: the logged-in user, or (admins only) the
+  // driver picked on the form.
+  const driverId = await resolveFillDriver(res.locals.user, req.body);
   // Save the fill + its BOL photos atomically: one transaction, never a half-saved fill.
   const client = await pool.connect();
   try {
@@ -120,7 +119,7 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
     const { rows: ins } = await client.query(
       `INSERT INTO fills (filled_at, customer_id, site_id, equipment_label, fuel_type, gallons, driver_id, notes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, res.locals.user.id, data.notes || null]
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, driverId, data.notes || null]
     );
     const fillId = ins[0].id;
     for (const d of bolDocs) {

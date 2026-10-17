@@ -7,7 +7,7 @@ const { parse } = require('csv-parse/sync');
 const pool = require('../db');
 const { requireAdmin, requireCsrf } = require('../middleware');
 const { isEmail, csvCell, todayStr, FUEL_TYPES, toInputDateTime } = require('../lib');
-const { bolUploadFields, validateBolDocs, formLookups, validateFill } = require('../fillForm');
+const { bolUploadFields, validateBolDocs, formLookups, validateFill, driverPickerLocals, resolveFillDriver } = require('../fillForm');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -120,10 +120,12 @@ router.get('/entries/:id/edit', async (req, res) => {
       fuel_type: FUEL_TYPES.includes(f.fuel_type) ? f.fuel_type : '__custom',
       fuel_type_custom: FUEL_TYPES.includes(f.fuel_type) ? '' : f.fuel_type,
       gallons: f.gallons, filled_at: toInputDateTime(f.filled_at), notes: f.notes || '',
+      driver_id: String(f.driver_id),
     },
     editing: f,
     bolDocs: docs.rows,
     formAction: '/admin/entries/' + f.id + '/edit', cancelUrl: '/admin/entries', docBase: '/admin/entries',
+    ...(await driverPickerLocals(res.locals.user)),
   });
 });
 
@@ -140,6 +142,7 @@ router.post('/entries/:id/edit', bolUploadFields, requireCsrf, async (req, res) 
       existing.rows[0].n + ' — add fewer.');
   }
   const allErrors = errors.concat(docErrors);
+  const picker = await driverPickerLocals(res.locals.user);
   if (allErrors.length) {
     const lookups = await formLookups();
     const docs = await pool.query(
@@ -147,15 +150,17 @@ router.post('/entries/:id/edit', bolUploadFields, requireCsrf, async (req, res) 
     return res.status(400).render('driver/fill_form', {
       lookups, errors: allErrors, form: req.body, editing: rows[0], bolDocs: docs.rows,
       formAction: '/admin/entries/' + req.params.id + '/edit', cancelUrl: '/admin/entries', docBase: '/admin/entries',
+      ...picker,
     });
   }
+  const driverId = await resolveFillDriver(res.locals.user, req.body);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query(
       `UPDATE fills SET filled_at=$1, customer_id=$2, site_id=$3, equipment_label=$4,
-       fuel_type=$5, gallons=$6, notes=$7, updated_at=NOW() WHERE id=$8`,
-      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, req.params.id]
+       fuel_type=$5, gallons=$6, notes=$7, driver_id=$8, updated_at=NOW() WHERE id=$9`,
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, driverId, req.params.id]
     );
     for (const d of bolDocs) {
       await client.query(
