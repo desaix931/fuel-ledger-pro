@@ -5,13 +5,22 @@ const { requireLogin, requireCsrf } = require('../middleware');
 const { FUEL_TYPES, toInputDateTime, todayStr } = require('../lib');
 const { bolUploadFields, validateBolDocs, formLookups, validateFill } = require('../fillForm');
 
-// View chrome for the shared fill form (driver URLs).
-function driverChrome(editId) {
+// View chrome for the shared fill form (driver URLs). Admins (managers who
+// also drive) can use the same form; their cancel/save lands back in the
+// admin entry log instead of the driver fill list.
+function driverChrome(editId, user) {
+  const admin = user && user.role === 'admin';
   return {
     formAction: editId ? '/driver/fills/' + editId + '/edit' : '/driver/fills',
-    cancelUrl: '/driver/fills',
+    cancelUrl: admin ? '/admin/entries' : '/driver/fills',
     docBase: '/driver/fills',
   };
+}
+
+// Where a successful save lands: admins back to the entry log, drivers to
+// their fill list. Fills are always attributed to the logged-in user.
+function afterSaveUrl(user) {
+  return user.role === 'admin' ? '/admin/entries' : '/driver/fills?saved=1';
 }
 
 const router = express.Router();
@@ -76,7 +85,7 @@ router.get('/fills/new', async (req, res) => {
   const lookups = await formLookups();
   res.render('driver/fill_form', {
     lookups, errors: [], form: { filled_at: toInputDateTime(new Date()) }, editing: null,
-    ...driverChrome(),
+    ...driverChrome(null, res.locals.user),
   });
 });
 
@@ -88,20 +97,20 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
   const allErrors = errors.concat(docErrors);
   if (allErrors.length) {
     const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: null, ...driverChrome() });
+    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: null, ...driverChrome(null, res.locals.user) });
   }
   // Verify customer/site exist and are active (and site belongs to customer).
   const cust = await pool.query('SELECT id FROM customers WHERE id = $1 AND active', [data.customerId]);
   if (!cust.rows.length) {
     const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors: ['Unknown customer.'], form: req.body, editing: null, ...driverChrome() });
+    return res.status(400).render('driver/fill_form', { lookups, errors: ['Unknown customer.'], form: req.body, editing: null, ...driverChrome(null, res.locals.user) });
   }
   if (data.siteId) {
     const site = await pool.query(
       'SELECT id FROM sites WHERE id = $1 AND customer_id = $2 AND active', [data.siteId, data.customerId]);
     if (!site.rows.length) {
       const lookups = await formLookups();
-      return res.status(400).render('driver/fill_form', { lookups, errors: ['That site does not belong to the chosen customer.'], form: req.body, editing: null, ...driverChrome() });
+      return res.status(400).render('driver/fill_form', { lookups, errors: ['That site does not belong to the chosen customer.'], form: req.body, editing: null, ...driverChrome(null, res.locals.user) });
     }
   }
   // Save the fill + its BOL photos atomically: one transaction, never a half-saved fill.
@@ -128,7 +137,7 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
   } finally {
     client.release();
   }
-  res.redirect('/driver/fills?saved=1');
+  res.redirect(afterSaveUrl(res.locals.user));
 });
 
 // --- Edit own fill ---
@@ -148,7 +157,7 @@ router.get('/fills/:id/edit', async (req, res) => {
       fuel_type_custom: FUEL_TYPES.includes(f.fuel_type) ? '' : f.fuel_type,
       gallons: f.gallons, filled_at: toInputDateTime(f.filled_at), notes: f.notes || '',
     },
-    editing: f, ...driverChrome(f.id),
+    editing: f, ...driverChrome(f.id, res.locals.user),
     bolDocs: docs.rows,
   });
 });
@@ -170,7 +179,7 @@ router.post('/fills/:id/edit', bolUploadFields, requireCsrf, async (req, res) =>
     const lookups = await formLookups();
     const docs = await pool.query(
       'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
-    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: rows[0], ...driverChrome(req.params.id), bolDocs: docs.rows });
+    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: rows[0], ...driverChrome(req.params.id, res.locals.user), bolDocs: docs.rows });
   }
   // Update the fill + append new BOL photos atomically.
   const client = await pool.connect();
@@ -195,7 +204,7 @@ router.post('/fills/:id/edit', bolUploadFields, requireCsrf, async (req, res) =>
   } finally {
     client.release();
   }
-  res.redirect('/driver/fills?saved=1');
+  res.redirect(afterSaveUrl(res.locals.user));
 });
 
 // Serve a BOL photo's bytes. Driver-scoped: only the driver who logged the fill.
