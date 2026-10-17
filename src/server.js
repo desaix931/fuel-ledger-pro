@@ -39,12 +39,13 @@ app.use(session({
   name: 'flp.sid',
   secret: process.env.SESSION_SECRET,
   resave: false,
+  rolling: true, // active use extends the login — no mid-shift timeouts
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 1000 * 60 * 60 * 12, // 12 hours
+    maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days: stays logged in until explicit logout
   },
 }));
 
