@@ -166,13 +166,13 @@ This replaces the Google Forms "Driver app" link on desaixtransportllc.com.
 The form is designed to sit inside an iframe:
 
 ```html
-<iframe src="https://app.yourdomain.com/apply"
+<iframe src="https://app.desaixtransportllc.com/apply"
         title="CDL Driver Job Application — Desaix Transport"
         style="width:100%;height:2300px;border:0;"
         loading="lazy"></iframe>
 ```
 
-Swap `app.yourdomain.com` for your real subdomain, and raise `height` if the
+Swap `app.desaixtransportllc.com` for your real subdomain, and raise `height` if the
 form ever grows (the page itself is responsive, so it works on phones and
 desktops alike).
 
@@ -223,7 +223,7 @@ Spam protection: honeypot + per-IP rate limiting (10/hour).
 **Embed on the company website** (separate from the application embed):
 
 ```html
-<iframe src="https://app.yourdomain.com/hire/package"
+<iframe src="https://app.desaixtransportllc.com/hire/package"
         title="DOT Compliance Hiring Package — Desaix Transport"
         style="width:100%;height:2600px;border:0;"
         loading="lazy"></iframe>

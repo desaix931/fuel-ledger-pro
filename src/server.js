@@ -29,7 +29,15 @@ app.use(expressLayouts);
 app.set('layout', 'layout');
 app.set('trust proxy', 1); // Render terminates TLS at the proxy
 
-app.use(helmet({ contentSecurityPolicy: false })); // CSP off: inline JS used for small UI helpers
+app.use(helmet({ contentSecurityPolicy: false, frameguard: false })); // CSP off: inline JS used for small UI helpers
+// Allow the public forms to be embedded on the company website (GoDaddy) via
+// iframe. frame-ancestors replaces X-Frame-Options (which helmet would otherwise
+// set to SAMEORIGIN, blocking the embed).
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy',
+    "frame-ancestors 'self' https://desaixtransportllc.com https://www.desaixtransportllc.com");
+  next();
+});
 app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
