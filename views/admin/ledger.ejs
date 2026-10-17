@@ -8,6 +8,12 @@
         <% customers.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
       </select>
     </label>
+    <label>Site (project) — optional
+      <select name="site_id">
+        <option value="">All sites</option>
+        <% sites.forEach((s) => { %><option value="<%= s.id %>"><%= s.customer_name %> — <%= s.name %></option><% }) %>
+      </select>
+    </label>
     <div class="filters">
       <label>From <input type="date" name="from"></label>
       <label>To <input type="date" name="to"></label>

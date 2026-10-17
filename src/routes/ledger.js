@@ -15,13 +15,14 @@ async function companyInfo() {
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
-async function ledgerData(customerId, from, to) {
+async function ledgerData(customerId, from, to, siteId) {
   const params = [customerId];
   const where = ['f.customer_id = $1'];
   if (from) { params.push(from); where.push(`f.filled_at >= $${params.length}::date`); }
   if (to) { params.push(to); where.push(`f.filled_at < ($${params.length}::date + INTERVAL '1 day')`); }
+  if (siteId) { params.push(siteId); where.push(`f.site_id = $${params.length}`); }
   const clause = 'WHERE ' + where.join(' AND ');
-  const [cust, fills, totals] = await Promise.all([
+  const [cust, fills, totals, byDriver, site] = await Promise.all([
     pool.query('SELECT * FROM customers WHERE id = $1', [customerId]),
     pool.query(
       `SELECT f.*, s.name AS site_name, u.name AS driver_name,
@@ -31,9 +32,14 @@ async function ledgerData(customerId, from, to) {
     pool.query(
       `SELECT f.fuel_type, SUM(f.gallons)::float AS gal, COUNT(*)::int AS n
        FROM fills f ${clause} GROUP BY f.fuel_type ORDER BY f.fuel_type`, params),
+    pool.query(
+      `SELECT u.name AS driver_name, SUM(f.gallons)::float AS gal, COUNT(*)::int AS n
+       FROM fills f JOIN users u ON u.id = f.driver_id ${clause}
+       GROUP BY u.name ORDER BY u.name`, params),
+    siteId ? pool.query('SELECT id, name FROM sites WHERE id = $1', [siteId]) : Promise.resolve({ rows: [] }),
   ]);
   const grand = totals.rows.reduce((a, r) => a + r.gal, 0);
-  return { customer: cust.rows[0], fills: fills.rows, totals: totals.rows, grand, from, to };
+  return { customer: cust.rows[0], fills: fills.rows, totals: totals.rows, byDriver: byDriver.rows, grand, from, to, site: site.rows[0] || null };
 }
 
 function ledgerText(company, data) {
@@ -46,6 +52,7 @@ function ledgerText(company, data) {
   L.push('');
   L.push('FUEL DELIVERY LEDGER');
   L.push(`Customer: ${data.customer.name}`);
+  if (data.site) L.push(`Site: ${data.site.name}`);
   L.push(`Period: ${data.from || 'beginning'} to ${data.to || 'today'}`);
   L.push('');
   L.push('Date              Site            Equipment        Fuel Type       Gallons  Driver');
@@ -60,6 +67,10 @@ function ledgerText(company, data) {
   L.push('-'.repeat(84));
   L.push('TOTALS BY FUEL TYPE:');
   for (const t of data.totals) L.push(`  ${t.fuel_type}: ${fmtGal(t.gal)} gal (${t.n} fills)`);
+  if (data.byDriver && data.byDriver.length > 1) {
+    L.push('TOTALS BY DRIVER:');
+    for (const d of data.byDriver) L.push(`  ${d.driver_name}: ${fmtGal(d.gal)} gal (${d.n} fills)`);
+  }
   L.push(`GRAND TOTAL: ${fmtGal(data.grand)} gal across ${data.fills.length} fills`);
   return L.join('\n');
 }
@@ -79,6 +90,7 @@ function buildLedgerPdf(company, data, from, to) {
       .forEach((l) => doc.text(l));
     doc.moveDown().fillColor('#000').fontSize(14).text('Fuel Delivery Ledger');
     doc.fontSize(10).text(`Customer: ${data.customer.name}`);
+    if (data.site) doc.text(`Site: ${data.site.name}`);
     doc.text(`Period: ${from || 'beginning'} to ${to || 'today'}`);
     doc.moveDown();
 
@@ -102,6 +114,12 @@ function buildLedgerPdf(company, data, from, to) {
     doc.font('Helvetica-Bold').text('Totals by fuel type:');
     doc.font('Helvetica');
     for (const t of data.totals) doc.text(`  ${t.fuel_type}: ${fmtGal(t.gal)} gal (${t.n} fills)`);
+    if (data.byDriver && data.byDriver.length > 1) {
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('Totals by driver:');
+      doc.font('Helvetica');
+      for (const d of data.byDriver) doc.text(`  ${d.driver_name}: ${fmtGal(d.gal)} gal (${d.n} fills)`);
+    }
     doc.moveDown();
     doc.font('Helvetica-Bold').fontSize(11)
       .text(`Grand total: ${fmtGal(data.grand)} gal across ${data.fills.length} fills`);
@@ -112,11 +130,16 @@ function buildLedgerPdf(company, data, from, to) {
 }
 
 function ledgerFilename(data, from, to, ext) {
-  return `ledger-${data.customer.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${from || 'all'}-to-${to || 'all'}.${ext}`;
+  const site = data.site ? '-' + data.site.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() : '';
+  return `ledger-${data.customer.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}${site}-${from || 'all'}-to-${to || 'all'}.${ext}`;
 }
 router.get('/', async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name FROM customers ORDER BY name');
-  res.render('admin/ledger', { customers: rows });
+  const [customers, sites] = await Promise.all([
+    pool.query('SELECT id, name FROM customers ORDER BY name'),
+    pool.query(`SELECT s.id, s.name, c.name AS customer_name FROM sites s
+                JOIN customers c ON c.id = s.customer_id ORDER BY c.name, s.name`),
+  ]);
+  res.render('admin/ledger', { customers: customers.rows, sites: sites.rows });
 });
 
 // --- Ledger preview ---
@@ -124,11 +147,12 @@ router.get('/view', async (req, res) => {
   const customerId = parseInt(req.query.customer_id, 10);
   const from = String(req.query.from || '').slice(0, 10);
   const to = String(req.query.to || '').slice(0, 10);
+  const siteId = parseInt(req.query.site_id, 10) || null;
   if (!customerId) return res.redirect('/admin/ledger');
-  const data = await ledgerData(customerId, from, to);
+  const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
   const company = await companyInfo();
-  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${siteId ? `&site_id=${siteId}` : ''}`;
   res.render('admin/ledger_view', {
     data, company, q, text: ledgerText(company, data),
     emailConfigured: mailer.isConfigured(),
@@ -145,8 +169,9 @@ router.get('/pdf', async (req, res) => {
   const customerId = parseInt(req.query.customer_id, 10);
   const from = String(req.query.from || '').slice(0, 10);
   const to = String(req.query.to || '').slice(0, 10);
+  const siteId = parseInt(req.query.site_id, 10) || null;
   if (!customerId) return res.status(400).send('Missing customer.');
-  const data = await ledgerData(customerId, from, to);
+  const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
   const company = await companyInfo();
 
@@ -161,7 +186,8 @@ router.post('/email', requireCsrf, async (req, res) => {
   const customerId = parseInt(req.body.customer_id, 10);
   const from = String(req.body.from || '').slice(0, 10);
   const to = String(req.body.to || '').slice(0, 10);
-  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const siteId = parseInt(req.body.site_id, 10) || null;
+  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${siteId ? `&site_id=${siteId}` : ''}`;
   const back = (msg, ok) =>
     res.redirect(`/admin/ledger/view?${q}&${ok ? 'emailed' : 'emailerr'}=${encodeURIComponent(msg)}`);
 
@@ -175,7 +201,7 @@ router.post('/email', requireCsrf, async (req, res) => {
   const subject = String(req.body.subject || '').trim().slice(0, 200) || 'Fuel delivery ledger';
   const message = String(req.body.message || '').trim().slice(0, 5000);
 
-  const data = await ledgerData(customerId, from, to);
+  const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
   const company = await companyInfo();
   const pdf = await buildLedgerPdf(company, data, from, to);
@@ -199,8 +225,9 @@ router.get('/csv', async (req, res) => {
   const customerId = parseInt(req.query.customer_id, 10);
   const from = String(req.query.from || '').slice(0, 10);
   const to = String(req.query.to || '').slice(0, 10);
+  const siteId = parseInt(req.query.site_id, 10) || null;
   if (!customerId) return res.status(400).send('Missing customer.');
-  const data = await ledgerData(customerId, from, to);
+  const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
   const lines = [['date', 'site', 'equipment', 'fuel_type', 'gallons', 'driver', 'notes'].join(',')];
   for (const f of data.fills) {
@@ -210,6 +237,11 @@ router.get('/csv', async (req, res) => {
   lines.push([]);
   lines.push(['TOTALS BY FUEL TYPE'].join(','));
   for (const t of data.totals) lines.push([t.fuel_type, Number(t.gal).toFixed(2)].map(csvCell).join(','));
+  if (data.byDriver && data.byDriver.length > 1) {
+    lines.push([]);
+    lines.push(['TOTALS BY DRIVER'].join(','));
+    for (const d of data.byDriver) lines.push([d.driver_name, Number(d.gal).toFixed(2)].map(csvCell).join(','));
+  }
   lines.push([`GRAND TOTAL, ${Number(data.grand).toFixed(2)} gallons`].join(','));
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition',
