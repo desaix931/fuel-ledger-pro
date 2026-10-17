@@ -49,5 +49,5 @@ services:
 
 databases:
   - name: fuel-ledger-db
-    plan: starter
+    plan: basic-256mb
     # Managed Postgres — data survives restarts and deploys.

@@ -66,7 +66,7 @@ Two iframe embeds in the README, both with the same 3 GoDaddy Website Builder st
 
 ## Costs (approximate, not quotes)
 
-- Render starter web service + starter Postgres: ~$14/month combined.
+- Render starter web service ($7) + Basic 256MB Postgres ($6): ~$13/month combined.
 - Free tier exists if you want a trial first, but the free database sleeps when
   idle — not what you want for a production tool.
 - No cost from GoDaddy for the subdomain or DNS record.
