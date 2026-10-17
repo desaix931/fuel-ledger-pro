@@ -1,6 +1,10 @@
 <% const title = 'Fill #' + x.id; %>
 <h1>Fill #<%= x.id %></h1>
 <p class="muted"><%= fmtDateTime(x.filled_at) %> · logged by <%= x.driver_name %></p>
+<p><a class="btn btn-sm" href="/admin/entries/<%= x.id %>/edit">Edit entry</a>
+  <form method="post" action="/admin/entries/<%= x.id %>/delete" class="inline" onsubmit="return confirm('Delete this entry? This cannot be undone.')"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <button class="btn btn-sm" type="submit">Delete entry</button></form>
+  <a class="btn btn-sm" href="/admin/entries">Back to log</a></p>
 
 <div class="card">
   <h2 style="margin-top:0">Details</h2>

@@ -6,7 +6,8 @@ const { parse } = require('csv-parse/sync');
 
 const pool = require('../db');
 const { requireAdmin, requireCsrf } = require('../middleware');
-const { isEmail, csvCell, todayStr } = require('../lib');
+const { isEmail, csvCell, todayStr, FUEL_TYPES, toInputDateTime } = require('../lib');
+const { bolUploadFields, validateBolDocs, formLookups, validateFill } = require('../fillForm');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -91,6 +92,83 @@ router.get('/entries/:id', async (req, res) => {
     [req.params.id]
   );
   res.render('admin/entry_detail', { x: rows[0], docs: docs.rows });
+});
+
+// Admin edit of any fill — reuses the driver fill form (same validation,
+// same BOL handling). The entry keeps its original driver.
+router.get('/entries/:id/edit', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM fills WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).send('Fill not found.');
+  const lookups = await formLookups();
+  const docs = await pool.query(
+    'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
+  const f = rows[0];
+  res.render('driver/fill_form', {
+    lookups, errors: [],
+    form: {
+      customer_id: String(f.customer_id), site_id: f.site_id ? String(f.site_id) : '',
+      equipment_label: f.equipment_label,
+      fuel_type: FUEL_TYPES.includes(f.fuel_type) ? f.fuel_type : '__custom',
+      fuel_type_custom: FUEL_TYPES.includes(f.fuel_type) ? '' : f.fuel_type,
+      gallons: f.gallons, filled_at: toInputDateTime(f.filled_at), notes: f.notes || '',
+    },
+    editing: f,
+    bolDocs: docs.rows,
+    formAction: '/admin/entries/' + f.id + '/edit', cancelUrl: '/admin/entries', docBase: '/admin/entries',
+  });
+});
+
+router.post('/entries/:id/edit', bolUploadFields, requireCsrf, async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM fills WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).send('Fill not found.');
+  const { errors, data } = validateFill(req.body);
+  const { errors: docErrors, docs: bolDocs } = req.bolUploadError
+    ? { errors: [req.bolUploadError], docs: [] }
+    : validateBolDocs(req.files);
+  const existing = await pool.query('SELECT COUNT(*)::int AS n FROM fill_documents WHERE fill_id = $1', [req.params.id]);
+  if (existing.rows[0].n + bolDocs.length > 3) {
+    docErrors.push('A fill can have at most 3 BOL photos. This fill already has ' +
+      existing.rows[0].n + ' — add fewer.');
+  }
+  const allErrors = errors.concat(docErrors);
+  if (allErrors.length) {
+    const lookups = await formLookups();
+    const docs = await pool.query(
+      'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
+    return res.status(400).render('driver/fill_form', {
+      lookups, errors: allErrors, form: req.body, editing: rows[0], bolDocs: docs.rows,
+      formAction: '/admin/entries/' + req.params.id + '/edit', cancelUrl: '/admin/entries', docBase: '/admin/entries',
+    });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE fills SET filled_at=$1, customer_id=$2, site_id=$3, equipment_label=$4,
+       fuel_type=$5, gallons=$6, notes=$7, updated_at=NOW() WHERE id=$8`,
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, req.params.id]
+    );
+    for (const d of bolDocs) {
+      await client.query(
+        `INSERT INTO fill_documents (fill_id, filename, mimetype, size_bytes, data)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [req.params.id, d.filename, d.mimetype, d.size, d.buffer]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+  res.redirect('/admin/entries?saved=1');
+});
+
+// Admin delete of any fill. BOL photos go with it (ON DELETE CASCADE).
+router.post('/entries/:id/delete', requireCsrf, async (req, res) => {
+  await pool.query('DELETE FROM fills WHERE id = $1', [req.params.id]);
+  res.redirect('/admin/entries?deleted=1');
 });
 
 // Serve a stored BOL photo's bytes. Admin-only (this router requires admin) —
