@@ -91,7 +91,7 @@
     <p class="muted" style="font-size:.9rem">List <strong>every</strong> employer from the last 3 years, most recent first. DOT requires each employer's address and whether the job was DOT-regulated.</p>
     <% values.employers.forEach((e, i) => { const n = i + 1; %>
       <div style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0">
-        <h3 style="margin:.2rem 0 .5rem">Employer <%= n %><%= n === 1 ? ' <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>' : '' %></h3>
+        <h3 style="margin:.2rem 0 .5rem">Employer <%= n %><%- n === 1 ? ' <span class="muted" style="font-weight:400;font-size:.85rem">(required)</span>' : '' %></h3>
         <label>Company name <input type="text" name="emp<%= n %>_company" <%= n === 1 ? 'required' : '' %> maxlength="160" value="<%= e.company %>"></label>
         <label>Street address <input type="text" name="emp<%= n %>_street" maxlength="200" value="<%= e.street %>"></label>
         <div class="filters">
