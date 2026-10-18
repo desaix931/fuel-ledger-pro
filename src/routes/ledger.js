@@ -38,8 +38,7 @@ async function ledgerData(customerId, from, to, siteId) {
        GROUP BY u.name ORDER BY u.name`, params),
     siteId ? pool.query('SELECT id, name FROM sites WHERE id = $1', [siteId]) : Promise.resolve({ rows: [] }),
   ]);
-  const grand = totals.rows.reduce((a, r) => a + r.gal, 0);
-  return { customer: cust.rows[0], fills: fills.rows, totals: totals.rows, byDriver: byDriver.rows, grand, from, to, site: site.rows[0] || null };
+  return { customer: cust.rows[0], fills: fills.rows, totals: totals.rows, byDriver: byDriver.rows, from, to, site: site.rows[0] || null };
 }
 
 function ledgerText(company, data) {
@@ -71,7 +70,6 @@ function ledgerText(company, data) {
     L.push('TOTALS BY DRIVER:');
     for (const d of data.byDriver) L.push(`  ${d.driver_name}: ${fmtGal(d.gal)} gal (${d.n} fills)`);
   }
-  L.push(`GRAND TOTAL: ${fmtGal(data.grand)} gal across ${data.fills.length} fills`);
   return L.join('\n');
 }
 
@@ -121,8 +119,6 @@ function buildLedgerPdf(company, data, from, to) {
       for (const d of data.byDriver) doc.text(`  ${d.driver_name}: ${fmtGal(d.gal)} gal (${d.n} fills)`);
     }
     doc.moveDown();
-    doc.font('Helvetica-Bold').fontSize(11)
-      .text(`Grand total: ${fmtGal(data.grand)} gal across ${data.fills.length} fills`);
     doc.fontSize(9).fillColor('#666')
       .text(`Generated ${fmtDateTime(new Date())}`, { align: 'right' });
     doc.end();
@@ -242,7 +238,7 @@ router.get('/csv', async (req, res) => {
     lines.push(['TOTALS BY DRIVER'].join(','));
     for (const d of data.byDriver) lines.push([d.driver_name, Number(d.gal).toFixed(2)].map(csvCell).join(','));
   }
-  lines.push([`GRAND TOTAL, ${Number(data.grand).toFixed(2)} gallons`].join(','));
+  lines.push([]);
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition',
     `attachment; filename="ledger-${data.customer.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${from || 'all'}-to-${to || 'all'}.csv"`);

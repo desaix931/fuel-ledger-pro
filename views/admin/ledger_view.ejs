@@ -62,7 +62,6 @@
     <% data.totals.forEach((t) => { %>
       <tr><td><%= t.fuel_type %></td><td class="num"><%= t.n %> fills</td><td class="num"><strong><%= fmtGal(t.gal) %> gal</strong></td></tr>
     <% }) %>
-    <tr><td><strong>Grand total</strong></td><td class="num"><strong><%= data.fills.length %> fills</strong></td><td class="num"><strong><%= fmtGal(data.grand) %> gal</strong></td></tr>
   </table>
 </div>
 
