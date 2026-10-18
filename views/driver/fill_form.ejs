@@ -4,6 +4,16 @@
 
 <form method="post" action="<%= formAction %>" id="fillform" enctype="multipart/form-data">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <% if (editing) { %>
+  <input type="hidden" name="latitude" value="<%= editing.latitude == null ? '' : editing.latitude %>">
+  <input type="hidden" name="longitude" value="<%= editing.longitude == null ? '' : editing.longitude %>">
+  <input type="hidden" name="location_accuracy" value="<%= editing.location_accuracy == null ? '' : editing.location_accuracy %>">
+  <% } else { %>
+  <input type="hidden" name="latitude" id="fill_lat">
+  <input type="hidden" name="longitude" id="fill_lng">
+  <input type="hidden" name="location_accuracy" id="fill_acc">
+  <% } %>
+  <p id="gpsbadge" class="muted" style="display:none;font-size:.85rem">📍 Location captured</p>
 
   <% if (isAdmin && drivers && drivers.length) { %>
   <div class="card">
@@ -131,5 +141,36 @@
   ft.addEventListener('change', function () {
     cfw.style.display = ft.value === '__custom' ? 'block' : 'none';
   });
+
+  // GPS: capture the phone's location when a new fill is logged. Optional —
+  // the fill saves fine without it. Skipped when logging on behalf of another
+  // driver (their location isn't ours to record).
+  (function () {
+    var latEl = document.getElementById('fill_lat');
+    if (!latEl || !('geolocation' in navigator)) return;
+    var lngEl = document.getElementById('fill_lng'),
+        accEl = document.getElementById('fill_acc'),
+        badge = document.getElementById('gpsbadge'),
+        driverSel = document.querySelector('select[name="driver_id"]'),
+        me = '<%= user.id %>';
+    function eligible() { return !driverSel || String(driverSel.value) === String(me); }
+    function clear() {
+      latEl.value = ''; lngEl.value = ''; accEl.value = '';
+      if (badge) badge.style.display = 'none';
+    }
+    function capture() {
+      if (!eligible()) { clear(); return; }
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        if (!eligible()) return;
+        latEl.value = pos.coords.latitude.toFixed(6);
+        lngEl.value = pos.coords.longitude.toFixed(6);
+        accEl.value = Math.round(pos.coords.accuracy);
+        if (badge) badge.style.display = '';
+      }, function () { /* denied or unavailable — fill still saves */ },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+    }
+    if (driverSel) driverSel.addEventListener('change', capture);
+    capture();
+  })();
 })();
 </script>

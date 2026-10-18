@@ -168,8 +168,9 @@ router.post('/entries/:id/edit', bolUploadFields, requireCsrf, async (req, res) 
     await client.query('BEGIN');
     await client.query(
       `UPDATE fills SET filled_at=$1, customer_id=$2, site_id=$3, equipment_label=$4,
-       fuel_type=$5, gallons=$6, notes=$7, driver_id=$8, updated_at=NOW() WHERE id=$9`,
-      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, driverId, req.params.id]
+       fuel_type=$5, gallons=$6, notes=$7, driver_id=$8, latitude=$9, longitude=$10,
+       location_accuracy=$11, updated_at=NOW() WHERE id=$12`,
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, driverId, data.latitude, data.longitude, data.locationAccuracy, req.params.id]
     );
     for (const d of bolDocs) {
       await client.query(

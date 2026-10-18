@@ -13,7 +13,12 @@
      <strong>Equipment:</strong> <%= x.equipment_label %><br>
      <strong>Fuel:</strong> <%= x.fuel_type %><br>
      <strong>Gallons:</strong> <%= fmtGal(x.gallons) %><br>
-     <strong>Notes:</strong> <%= x.notes || '—' %></p>
+     <strong>Notes:</strong> <%= x.notes || '—' %><br>
+     <% if (x.latitude != null && x.longitude != null) { %>
+     <strong>GPS:</strong> <%= Number(x.latitude).toFixed(5) %>, <%= Number(x.longitude).toFixed(5) %>
+       <% if (x.location_accuracy != null) { %><span class="muted">(±<%= Math.round(x.location_accuracy) %> m)</span><% } %>
+       · <a href="https://www.google.com/maps?q=<%= x.latitude %>,<%= x.longitude %>" target="_blank" rel="noopener">View map</a>
+     <% } else { %><strong>GPS:</strong> <span class="muted">not captured</span><% } %></p>
 </div>
 
 <div class="card">

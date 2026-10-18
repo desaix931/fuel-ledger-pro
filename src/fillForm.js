@@ -107,7 +107,27 @@ function validateFill(body) {
   if (!equipmentLabel) errors.push('Enter the equipment (e.g. "Gen 3").');
 
   const notes = String(body.notes || '').trim().slice(0, 2000);
-  return { errors, data: { customerId, siteId, fuelType, gallons, filledAt, equipmentLabel, notes } };
+
+  // GPS captured on the fill form (optional — the fill saves without it).
+  const numOrNull = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const latitude = numOrNull(body.latitude);
+  const longitude = numOrNull(body.longitude);
+  const locationAccuracy = numOrNull(body.location_accuracy);
+  if (Number.isNaN(latitude) || (latitude !== null && (latitude < -90 || latitude > 90))) errors.push('Invalid GPS latitude.');
+  if (Number.isNaN(longitude) || (longitude !== null && (longitude < -180 || longitude > 180))) errors.push('Invalid GPS longitude.');
+  if (Number.isNaN(locationAccuracy) || (locationAccuracy !== null && locationAccuracy < 0)) errors.push('Invalid GPS accuracy.');
+  const latOk = latitude !== null && !Number.isNaN(latitude);
+  const lngOk = longitude !== null && !Number.isNaN(longitude);
+  if (latOk !== lngOk) errors.push('Incomplete GPS location.');
+  return { errors, data: { customerId, siteId, fuelType, gallons, filledAt, equipmentLabel, notes,
+    latitude: Number.isNaN(latitude) ? null : latitude,
+    longitude: Number.isNaN(longitude) ? null : longitude,
+    locationAccuracy: Number.isNaN(locationAccuracy) ? null : locationAccuracy } };
 }
 
 module.exports = { bolUploadFields, validateBolDocs, formLookups, validateFill };
