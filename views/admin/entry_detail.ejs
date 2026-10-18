@@ -12,6 +12,7 @@
      <strong>Site:</strong> <%= x.site_name || '—' %><br>
      <strong>Equipment:</strong> <%= x.equipment_label %><br>
      <strong>Fuel:</strong> <%= x.fuel_type %><br>
+     <strong>BOL #:</strong> <%= x.bol_number || '—' %><br>
      <strong>Gallons:</strong> <%= fmtGal(x.gallons) %><br>
      <strong>Notes:</strong> <%= x.notes || '—' %><br>
      <% if (x.latitude != null && x.longitude != null) { %>

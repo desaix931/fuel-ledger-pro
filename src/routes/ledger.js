@@ -60,7 +60,8 @@ function ledgerText(company, data) {
     L.push(
       `${fmtDateTime(f.filled_at).padEnd(18)}${(f.site_name || '-').slice(0, 15).padEnd(16)}` +
       `${f.equipment_label.slice(0, 16).padEnd(17)}${f.fuel_type.slice(0, 14).padEnd(16)}` +
-      `${fmtGal(f.gallons).padStart(8)}  ${f.driver_name}`
+      `${fmtGal(f.gallons).padStart(8)}  ${f.driver_name}` +
+      (f.bol_number ? `  BOL#${f.bol_number}` : '')
     );
   }
   L.push('-'.repeat(84));
@@ -92,8 +93,8 @@ function buildLedgerPdf(company, data, from, to) {
     doc.text(`Period: ${from || 'beginning'} to ${to || 'today'}`);
     doc.moveDown();
 
-    const cols = [92, 110, 110, 90, 62]; // date, site, equipment, fuel, gallons
-    const headers = ['Date', 'Site', 'Equipment', 'Fuel type', 'Gallons'];
+    const cols = [80, 95, 95, 80, 70, 55]; // date, site, equipment, fuel, BOL #, gallons
+    const headers = ['Date', 'Site', 'Equipment', 'Fuel type', 'BOL #', 'Gallons'];
     const y0 = doc.y;
     doc.font('Helvetica-Bold').fontSize(9);
     let x = 48;
@@ -104,7 +105,7 @@ function buildLedgerPdf(company, data, from, to) {
     for (const f of data.fills) {
       if (y > 700) { doc.addPage(); y = 48; }
       x = 48;
-      const cells = [fmtDateTime(f.filled_at), f.site_name || '-', f.equipment_label, f.fuel_type, fmtGal(f.gallons)];
+      const cells = [fmtDateTime(f.filled_at), f.site_name || '-', f.equipment_label, f.fuel_type, f.bol_number || '-', fmtGal(f.gallons)];
       cells.forEach((c, i) => { doc.text(String(c).slice(0, 28), x, y, { width: cols[i] }); x += cols[i]; });
       y += rowH;
     }
@@ -225,9 +226,9 @@ router.get('/csv', async (req, res) => {
   if (!customerId) return res.status(400).send('Missing customer.');
   const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
-  const lines = [['date', 'site', 'equipment', 'fuel_type', 'gallons', 'driver', 'notes'].join(',')];
+  const lines = [['date', 'site', 'equipment', 'fuel_type', 'bol_number', 'gallons', 'driver', 'notes'].join(',')];
   for (const f of data.fills) {
-    lines.push([fmtDateTime(f.filled_at), f.site_name, f.equipment_label, f.fuel_type,
+    lines.push([fmtDateTime(f.filled_at), f.site_name, f.equipment_label, f.fuel_type, f.bol_number,
       Number(f.gallons).toFixed(2), f.driver_name, f.notes].map(csvCell).join(','));
   }
   lines.push([]);

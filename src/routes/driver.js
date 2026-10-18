@@ -118,10 +118,10 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
     await client.query('BEGIN');
     const { rows: ins } = await client.query(
       `INSERT INTO fills (filled_at, customer_id, site_id, equipment_label, fuel_type, gallons, driver_id, notes,
-                          latitude, longitude, location_accuracy)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+                          latitude, longitude, location_accuracy, bol_number)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
       [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, driverId, data.notes || null,
-       data.latitude, data.longitude, data.locationAccuracy]
+       data.latitude, data.longitude, data.locationAccuracy, data.bolNumber || null]
     );
     const fillId = ins[0].id;
     for (const d of bolDocs) {

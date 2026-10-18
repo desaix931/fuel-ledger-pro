@@ -63,7 +63,7 @@ function validateBolDocs(files) {
 }
 
 async function formLookups() {
-  const [customers, sites, equipment, recentEq] = await Promise.all([
+  const [customers, sites, equipment, recentEq, recentBol] = await Promise.all([
     pool.query("SELECT id, name FROM customers WHERE active ORDER BY name"),
     pool.query(`SELECT s.id, s.name, s.customer_id, c.name AS customer_name
                 FROM sites s JOIN customers c ON c.id = s.customer_id
@@ -72,12 +72,16 @@ async function formLookups() {
                 FROM equipment e LEFT JOIN sites s ON s.id = e.site_id
                 WHERE e.active ORDER BY e.label`),
     pool.query(`SELECT equipment_label, MAX(filled_at) AS m FROM fills GROUP BY equipment_label ORDER BY m DESC LIMIT 24`),
+    pool.query(`SELECT bol_number, MAX(filled_at) AS m FROM fills
+                WHERE bol_number IS NOT NULL AND bol_number <> ''
+                GROUP BY bol_number ORDER BY m DESC LIMIT 10`),
   ]);
   return {
     customers: customers.rows,
     sites: sites.rows,
     equipment: equipment.rows,
     recentEquipment: recentEq.rows.map((r) => r.equipment_label),
+    recentBolNumbers: recentBol.rows.map((r) => r.bol_number),
   };
 }
 
@@ -108,6 +112,8 @@ function validateFill(body) {
 
   const notes = String(body.notes || '').trim().slice(0, 2000);
 
+  const bolNumber = String(body.bol_number || '').trim().slice(0, 60);
+
   // GPS captured on the fill form (optional — the fill saves without it).
   const numOrNull = (v) => {
     const s = String(v == null ? '' : v).trim();
@@ -125,6 +131,7 @@ function validateFill(body) {
   const lngOk = longitude !== null && !Number.isNaN(longitude);
   if (latOk !== lngOk) errors.push('Incomplete GPS location.');
   return { errors, data: { customerId, siteId, fuelType, gallons, filledAt, equipmentLabel, notes,
+    bolNumber,
     latitude: Number.isNaN(latitude) ? null : latitude,
     longitude: Number.isNaN(longitude) ? null : longitude,
     locationAccuracy: Number.isNaN(locationAccuracy) ? null : locationAccuracy } };

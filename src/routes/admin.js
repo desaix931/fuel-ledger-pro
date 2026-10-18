@@ -129,7 +129,7 @@ router.get('/entries/:id/edit', async (req, res) => {
       fuel_type: FUEL_TYPES.includes(f.fuel_type) ? f.fuel_type : '__custom',
       fuel_type_custom: FUEL_TYPES.includes(f.fuel_type) ? '' : f.fuel_type,
       gallons: f.gallons, filled_at: toInputDateTime(f.filled_at), notes: f.notes || '',
-      driver_id: String(f.driver_id),
+      driver_id: String(f.driver_id), bol_number: f.bol_number || '',
     },
     editing: f,
     bolDocs: docs.rows,
@@ -169,8 +169,8 @@ router.post('/entries/:id/edit', bolUploadFields, requireCsrf, async (req, res) 
     await client.query(
       `UPDATE fills SET filled_at=$1, customer_id=$2, site_id=$3, equipment_label=$4,
        fuel_type=$5, gallons=$6, notes=$7, driver_id=$8, latitude=$9, longitude=$10,
-       location_accuracy=$11, updated_at=NOW() WHERE id=$12`,
-      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, driverId, data.latitude, data.longitude, data.locationAccuracy, req.params.id]
+       location_accuracy=$11, bol_number=$12, updated_at=NOW() WHERE id=$13`,
+      [data.filledAt, data.customerId, data.siteId, data.equipmentLabel, data.fuelType, data.gallons, data.notes || null, driverId, data.latitude, data.longitude, data.locationAccuracy, data.bolNumber || null, req.params.id]
     );
     for (const d of bolDocs) {
       await client.query(

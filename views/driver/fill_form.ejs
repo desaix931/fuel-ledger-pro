@@ -56,6 +56,18 @@
         <% }) %>
       </div>
     <% } %>
+    <label>BOL number <span class="muted" style="font-weight:400">(from the fuel source)</span>
+      <input type="text" name="bol_number" id="bolnumber" maxlength="60" autocomplete="off"
+             placeholder="e.g. 88410237" value="<%= form.bol_number || '' %>">
+    </label>
+    <% if (lookups.recentBolNumbers && lookups.recentBolNumbers.length) { %>
+      <div class="muted" style="font-size:.85rem">Tap to reuse:</div>
+      <div class="chips" id="bolchips">
+        <% lookups.recentBolNumbers.forEach((b) => { %>
+          <button type="button" class="chip" data-bol="<%= b %>"><%= b %></button>
+        <% }) %>
+      </div>
+    <% } %>
   </div>
 
   <div class="card">
@@ -132,6 +144,9 @@
   cust.addEventListener('change', filterSites); filterSites();
   document.getElementById('eqchips')?.addEventListener('click', function (e) {
     var b = e.target.closest('[data-eq]'); if (b) eq.value = b.getAttribute('data-eq');
+  });
+  document.getElementById('bolchips')?.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-bol]'); if (b) document.getElementById('bolnumber').value = b.getAttribute('data-bol');
   });
   document.getElementById('galpad').addEventListener('click', function (e) {
     var b = e.target.closest('[data-add]'); if (!b) return;
