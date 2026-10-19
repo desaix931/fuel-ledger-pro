@@ -39,6 +39,13 @@ function parseRecipients(raw, max = 20) {
 }
 
 async function sendMail({ to, subject, text, attachments }) {
+  // Prefer Microsoft OAuth2 when it is set up and connected (required when
+  // the tenant enforces MFA / blocks basic SMTP AUTH). Otherwise fall back
+  // to plain SMTP AUTH.
+  const msmail = require('./msmail');
+  if (msmail.isEnvConfigured() && await msmail.isConnected()) {
+    return msmail.sendMail({ to, subject, text, attachments });
+  }
   const t = transporter();
   if (!t) throw new Error('Email is not configured. Set SMTP_HOST (and friends) in the environment.');
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
@@ -46,4 +53,13 @@ async function sendMail({ to, subject, text, attachments }) {
   await t.sendMail({ from, to, subject, text, attachments });
 }
 
-module.exports = { isConfigured, parseRecipients, sendMail };
+// 'oauth' = Microsoft modern sign-in connected, 'smtp' = basic SMTP AUTH,
+// 'none' = nothing configured.
+async function emailMode() {
+  const msmail = require('./msmail');
+  if (msmail.isEnvConfigured() && await msmail.isConnected()) return 'oauth';
+  if (isConfigured()) return 'smtp';
+  return 'none';
+}
+
+module.exports = { isConfigured, parseRecipients, sendMail, emailMode };
