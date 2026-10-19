@@ -54,12 +54,14 @@ async function setSetting(key, value) {
   );
 }
 
-async function getAccessToken() {
+async function getAccessToken(opts = {}) {
   const e = env();
   if (!isEnvConfigured()) throw new Error('Set MS_CLIENT_ID, MS_TENANT_ID and MS_CLIENT_SECRET first.');
-  const cached = await getSetting('ms_smtp_access_token');
-  const exp = parseInt((await getSetting('ms_smtp_access_expires_at')) || '0', 10);
-  if (cached && Date.now() < exp) return cached;
+  if (!opts.fresh) {
+    const cached = await getSetting('ms_smtp_access_token');
+    const exp = parseInt((await getSetting('ms_smtp_access_expires_at')) || '0', 10);
+    if (cached && Date.now() < exp) return cached;
+  }
 
   const body = new URLSearchParams({
     client_id: e.clientId,
@@ -83,11 +85,11 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-// Reads the permission roles embedded in the app's access token, without
+// Reads the permission roles embedded in a FRESH access token, without
 // logging or exposing the token itself. Used by the Admin -> Email
 // "Check Microsoft permissions" diagnostic.
 async function tokenRoles() {
-  const token = await getAccessToken();
+  const token = await getAccessToken({ fresh: true });
   const segment = String(token).split('.')[1] || '';
   let payload = {};
   try {
@@ -96,18 +98,38 @@ async function tokenRoles() {
   return Array.isArray(payload.roles) ? payload.roles : [];
 }
 
-async function sendMail({ to, subject, text, attachments }) {  const nodemailer = require('nodemailer');
+function isAuthFailure(e) {
+  if (!e) return false;
+  return e.responseCode === 535 ||
+    /authentication unsuccessful/i.test(e.response || '') ||
+    /invalid login/i.test(e.message || '');
+}
+
+async function buildTransporter(fresh) {
+  const nodemailer = require('nodemailer');
   const user = process.env.SMTP_USER;
   if (!user) throw new Error('Set SMTP_USER to the mailbox address (e.g. admin@desaixtransportllc.com).');
-  const accessToken = await getAccessToken();
+  const accessToken = await getAccessToken({ fresh });
   const t = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.office365.com',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     secure: false,
     auth: { type: 'OAuth2', user, accessToken },
   });
-  const from = process.env.SMTP_FROM || user;
-  await t.sendMail({ from, to, subject, text, attachments });
+  return { t, from: process.env.SMTP_FROM || user };
+}
+
+async function sendMail({ to, subject, text, attachments }) {
+  let { t, from } = await buildTransporter(false);
+  try {
+    await t.sendMail({ from, to, subject, text, attachments });
+  } catch (e) {
+    // The cached token may predate a permission grant — fetch a fresh one
+    // and retry once before giving up.
+    if (!isAuthFailure(e)) throw e;
+    ({ t, from } = await buildTransporter(true));
+    await t.sendMail({ from, to, subject, text, attachments });
+  }
 }
 
 module.exports = { isEnvConfigured, getAccessToken, tokenRoles, sendMail };
