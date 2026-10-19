@@ -1,6 +1,4 @@
 <% const title = 'Ledger — ' + data.customer.name; %>
-<% if (emailed) { %><div class="alert ok noprint"><%= emailed %></div><% } %>
-<% if (emailerr) { %><div class="alert err noprint"><%= emailerr %></div><% } %>
 <div class="noprint" style="margin-bottom:1rem">
   <a href="/admin/ledger">← Back to builder</a>
   <div class="rowbtns" style="margin-top:.6rem">
@@ -12,34 +10,6 @@
   </div>
 </div>
 
-<details class="card noprint" style="margin-bottom:1rem">
-  <summary style="cursor:pointer;font-weight:600">✉️ Email this ledger (PDF attached)</summary>
-  <% if (!ledgerEmailEnabled) { %>
-    <p class="muted">Emailing ledgers is disabled on this server.</p>
-  <% } else if (!emailConfigured) { %>
-    <p class="muted">Email is not configured on this server. Set <code>SMTP_HOST</code> (plus
-    <code>SMTP_USER</code>/<code>SMTP_PASS</code>/<code>SMTP_FROM</code>) in the environment and restart to enable it.</p>
-  <% } else { %>
-    <form method="post" action="/admin/ledger/email" style="margin-top:.6rem">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <input type="hidden" name="customer_id" value="<%= data.customer.id %>">
-      <input type="hidden" name="from" value="<%= data.from || '' %>">
-      <input type="hidden" name="to" value="<%= data.to || '' %>">
-      <input type="hidden" name="site_id" value="<%= data.site ? data.site.id : '' %>">
-      <label>Recipients (comma or semicolon separated, up to 20)
-        <input type="text" name="recipients" required placeholder="ap@customer.com, billing@customer.com"
-               value="<%= data.customer.billing_email ? data.customer.billing_email : '' %>">
-      </label>
-      <label>Subject
-        <input type="text" name="subject" value="<%= defaultSubject %>" maxlength="200">
-      </label>
-      <label>Message
-        <textarea name="message" rows="3" maxlength="5000"><%= defaultMessage %></textarea>
-      </label>
-      <button class="btn-primary" type="submit">Send ledger email</button>
-    </form>
-  <% } %>
-</details>
 
 <div class="card">
   <% if (company.company_name) { %><h1 style="margin-bottom:0"><%= company.company_name %></h1><% } %>

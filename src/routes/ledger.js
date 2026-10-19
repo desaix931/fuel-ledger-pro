@@ -5,7 +5,6 @@ const PDFDocument = require('pdfkit');
 const pool = require('../db');
 const { requireAdmin, requireCsrf } = require('../middleware');
 const { csvCell, fmtDateTime, fmtGal } = require('../lib');
-const mailer = require('../lib/mailer');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -139,12 +138,6 @@ router.get('/', async (req, res) => {
   res.render('admin/ledger', { customers: customers.rows, sites: sites.rows });
 });
 
-// Ledger email is a separate opt-in: the shared SMTP mailbox is reserved for
-// form notifications unless LEDGER_EMAIL_ENABLED=true is set.
-function ledgerEmailEnabled() {
-  return String(process.env.LEDGER_EMAIL_ENABLED || '').toLowerCase() === 'true';
-}
-
 // --- Ledger preview ---
 router.get('/view', async (req, res) => {
   const customerId = parseInt(req.query.customer_id, 10);
@@ -158,13 +151,6 @@ router.get('/view', async (req, res) => {
   const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${siteId ? `&site_id=${siteId}` : ''}`;
   res.render('admin/ledger_view', {
     data, company, q, text: ledgerText(company, data),
-    emailConfigured: mailer.isConfigured(),
-    ledgerEmailEnabled: ledgerEmailEnabled(),
-    emailed: req.query.emailed || null,
-    emailerr: req.query.emailerr || null,
-    defaultSubject: `Fuel delivery ledger — ${data.customer.name} (${from || 'all'} to ${to || 'all'})`,
-    defaultMessage: `Attached is the fuel delivery ledger for ${data.customer.name}, ` +
-      `${from || 'the beginning'} to ${to || 'today'}.`,
   });
 });
 
@@ -183,46 +169,6 @@ router.get('/pdf', async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${ledgerFilename(data, from, to, 'pdf')}"`);
   const pdf = await buildLedgerPdf(company, data, from, to);
   res.send(pdf);
-});
-
-// --- Email ledger (PDF attached) to multiple recipients ---
-router.post('/email', requireCsrf, async (req, res) => {
-  const customerId = parseInt(req.body.customer_id, 10);
-  const from = String(req.body.from || '').slice(0, 10);
-  const to = String(req.body.to || '').slice(0, 10);
-  const siteId = parseInt(req.body.site_id, 10) || null;
-  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${siteId ? `&site_id=${siteId}` : ''}`;
-  const back = (msg, ok) =>
-    res.redirect(`/admin/ledger/view?${q}&${ok ? 'emailed' : 'emailerr'}=${encodeURIComponent(msg)}`);
-
-  if (!customerId) return back('Missing customer.', false);
-  if (!ledgerEmailEnabled()) return back('Emailing ledgers is disabled on this server.', false);
-  let recipients;
-  try {
-    recipients = mailer.parseRecipients(req.body.recipients);
-  } catch (e) {
-    return back(e.message, false);
-  }
-  const subject = String(req.body.subject || '').trim().slice(0, 200) || 'Fuel delivery ledger';
-  const message = String(req.body.message || '').trim().slice(0, 5000);
-
-  const data = await ledgerData(customerId, from, to, siteId);
-  if (!data.customer) return res.status(404).send('Customer not found.');
-  const company = await companyInfo();
-  const pdf = await buildLedgerPdf(company, data, from, to);
-  const text = ledgerText(company, data);
-
-  try {
-    await mailer.sendMail({
-      to: recipients.join(', '),
-      subject,
-      text: (message ? message + '\n\n' : '') + text,
-      attachments: [{ filename: ledgerFilename(data, from, to, 'pdf'), content: pdf, contentType: 'application/pdf' }],
-    });
-  } catch (e) {
-    return back('Could not send email: ' + e.message, false);
-  }
-  return back(`Sent to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}.`, true);
 });
 
 // --- CSV download ---

@@ -13,7 +13,7 @@ All timestamps are the business's local time.
 - **Driver** — log fills (mobile-first form, incl. optional BOL photos), view/edit own recent fills, see "My schedule".
 - **Admin (office)** — everything: dashboard, full entry log with filters,
   customer/site/equipment management, user management, dispatch scheduling,
-  ledger builder (PDF / CSV / copy-as-text / **email to multiple recipients**),
+  ledger builder (PDF / CSV / copy-as-text / phone share sheet),
   billing CSV export, CSV import.
 
 ## BOL photos on fills
@@ -62,7 +62,7 @@ You need: a Render account and this repo pushed to GitHub/GitLab.
    - `ADMIN_EMAIL` — the office login email
    - `ADMIN_PASSWORD` — a strong password (change it after first login)
    - `COMPANY_NAME`, `COMPANY_PHONE`, `COMPANY_EMAIL`, `COMPANY_ADDRESS` (optional; also editable in Admin → Settings)
-   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (optional — only needed for the "Email this ledger" feature; see below)
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (for driver application + DOT package email notifications to the office)
    - `SESSION_SECRET` is generated automatically.
 4. Deploy. The container runs migrations and the admin seed on first boot.
    Health check: `https://<your-service>.onrender.com/healthz`
@@ -75,32 +75,18 @@ Notes:
 - The starter database + web service are each a few dollars a month; the
   free tier works for a trial but the database sleeps/spins down on free.
 
-## Email setup (optional — for "Email this ledger")
+## Email setup (driver application + DOT package notifications)
 
-On the ledger page, the office can email the ledger as a PDF attachment to
-up to 20 recipients at once (comma- or semicolon-separated). This needs SMTP
-credentials:
+Set these so new driver applications (`/apply`) and DOT hiring packages
+(`/hire/package`) notify the office by email the moment they are submitted:
 
-- **Easiest:** your company's existing email. If the domain's mail is hosted
-  at GoDaddy/Microsoft 365/Google Workspace, create a dedicated mailbox (or
-  app password) and use its SMTP settings.
-- **Alternative:** a transactional service (SendGrid, Mailgun, Amazon SES —
-  all have free tiers).
+  - `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+  - `APPLY_NOTIFY_EMAIL` — the office inbox that receives the notifications
+    (falls back to the `company_email` setting, then `COMPANY_EMAIL`)
 
-Set on Render (service → Environment), or in `.env` locally:
+Submissions are always saved to the database even if the email fails; the
+admin Applications / DOT Packages inboxes show whether the notification went out.
 
-| Var | Example |
-|---|---|
-| `SMTP_HOST` | `smtp.office365.com` |
-| `SMTP_PORT` | `587` |
-| `SMTP_SECURE` | `false` (only `true` for port 465) |
-| `SMTP_USER` | `ledgers@yourcompany.com` |
-| `SMTP_PASS` | the mailbox password or app password |
-| `SMTP_FROM` | `ledgers@yourcompany.com` |
-
-If `SMTP_HOST` is not set, the email form shows a notice instead of failing —
-everything else works normally. The recipient field is pre-filled with the
-customer's billing email when one is saved.
 
 ## Point a domain at it (later)
 
