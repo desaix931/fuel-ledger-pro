@@ -39,11 +39,11 @@ function parseRecipients(raw, max = 20) {
 }
 
 async function sendMail({ to, subject, text, attachments }) {
-  // Prefer Microsoft OAuth2 when it is set up and connected (required when
-  // the tenant enforces MFA / blocks basic SMTP AUTH). Otherwise fall back
-  // to plain SMTP AUTH.
+  // Prefer Microsoft OAuth2 (application permission) when its credentials
+  // are configured — required when the tenant blocks basic SMTP AUTH
+  // (MFA / Security Defaults). Otherwise fall back to plain SMTP AUTH.
   const msmail = require('./msmail');
-  if (msmail.isEnvConfigured() && await msmail.isConnected()) {
+  if (msmail.isEnvConfigured()) {
     return msmail.sendMail({ to, subject, text, attachments });
   }
   const t = transporter();
@@ -53,11 +53,11 @@ async function sendMail({ to, subject, text, attachments }) {
   await t.sendMail({ from, to, subject, text, attachments });
 }
 
-// 'oauth' = Microsoft modern sign-in connected, 'smtp' = basic SMTP AUTH,
+// 'oauth' = Microsoft modern sign-in configured, 'smtp' = basic SMTP AUTH,
 // 'none' = nothing configured.
 async function emailMode() {
   const msmail = require('./msmail');
-  if (msmail.isEnvConfigured() && await msmail.isConnected()) return 'oauth';
+  if (msmail.isEnvConfigured()) return 'oauth';
   if (isConfigured()) return 'smtp';
   return 'none';
 }

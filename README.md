@@ -87,6 +87,26 @@ Set these so new driver applications (`/apply`) and DOT hiring packages
 Submissions are always saved to the database even if the email fails; the
 admin Applications / DOT Packages inboxes show whether the notification went out.
 
+### Microsoft 365 modern sign-in (required when the tenant enforces MFA)
+
+Plain-password SMTP AUTH stops working when the Microsoft 365 tenant enforces
+MFA / Security Defaults (Microsoft blocks legacy auth, and app passwords are
+not offered under Security Defaults). The app then authenticates as itself
+and sends through `smtp.office365.com` using OAuth2 client credentials:
+
+  1. Entra admin center → Identity → Applications → App registrations →
+     New registration. Name `Fuel Ledger Mail`, single tenant (no redirect
+     URI needed).
+  2. API permissions → Add a permission → "APIs my organization uses" →
+     Office 365 Exchange Online → Application permissions →
+     check `SMTP.SendAsApp` → Add permissions → Grant admin consent.
+  3. Certificates & secrets → New client secret → copy the secret **value**.
+  4. Set on Render: `MS_CLIENT_ID`, `MS_TENANT_ID`, `MS_CLIENT_SECRET`.
+  5. In the app: Admin → Email → **Send test email** to verify.
+
+(`SMTP_PASS` is only needed for the legacy username/password path, which most
+MFA-enforced tenants block.)
+
 
 ## Point a domain at it (later)
 

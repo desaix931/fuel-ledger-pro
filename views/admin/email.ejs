@@ -1,6 +1,6 @@
 <% const title = 'Email'; %>
 <h1>Email</h1>
-<p class="muted">Connects the office Microsoft 365 mailbox so driver applications and DOT packages notify the office by email. Uses Microsoft's modern sign-in (OAuth2) — works even when the tenant blocks plain-password SMTP.</p>
+<p class="muted">Connects the office Microsoft 365 mailbox so driver applications and DOT packages notify the office by email. Uses Microsoft's modern sign-in (OAuth2 application permission) — works even when the tenant blocks plain-password SMTP.</p>
 <% if (ok) { %><div class="alert ok"><%= ok %></div><% } %>
 <% if (err) { %><div class="alert err"><%= err %></div><% } %>
 
@@ -9,23 +9,16 @@
   <% if (!envOk) { %>
     <p><strong>Not set up yet.</strong> The server needs the Microsoft app credentials first. In the Microsoft Entra admin center:</p>
     <ol>
-      <li><strong>Identity → Applications → App registrations → New registration.</strong> Name it <code>Fuel Ledger Mail</code>, single tenant. Redirect URI (Web):<br><code><%= redirectUri %></code></li>
-      <li><strong>API permissions → Add a permission → Office 365 Exchange Online → Delegated permissions</strong> → check <strong>SMTP.Send</strong> → Add, then <strong>Grant admin consent</strong>.</li>
+      <li><strong>Identity → Applications → App registrations → New registration.</strong> Name it <code>Fuel Ledger Mail</code>, single tenant. (No redirect URI needed.)</li>
+      <li><strong>API permissions → Add a permission → "APIs my organization uses" → Office 365 Exchange Online → Application permissions</strong> → check <strong>SMTP.SendAsApp</strong> → Add permissions, then <strong>Grant admin consent</strong>.</li>
       <li><strong>Certificates &amp; secrets → New client secret</strong> → copy the secret <strong>value</strong> (not the ID). Also copy the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong> from the app's Overview page.</li>
-      <li>On Render (service → Environment), set <code>MS_CLIENT_ID</code>, <code>MS_TENANT_ID</code> and <code>MS_CLIENT_SECRET</code> to those three values, then come back here.</li>
+      <li>On Render (service → Environment), set <code>MS_CLIENT_ID</code>, <code>MS_TENANT_ID</code> and <code>MS_CLIENT_SECRET</code> to those three values, then come back here and send a test.</li>
     </ol>
-  <% } else if (!connected) { %>
-    <p><strong>Ready to connect.</strong> Sign in once as the office mailbox (<code>admin@desaixtransportllc.com</code>) to authorize the app to send on its behalf.</p>
-    <p><a class="btn-primary" href="/admin/email/connect">Connect Microsoft email</a></p>
   <% } else { %>
-    <p><strong>Connected ✓</strong><% if (account) { %> — sending as <code><%= account %></code><% } %></p>
-    <form method="post" action="/admin/email/test" style="display:inline">
+    <p><strong>Ready ✓</strong> — the app authenticates to Microsoft 365 as itself and sends as the office mailbox.</p>
+    <form method="post" action="/admin/email/test">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn" type="submit">Send test email</button>
-    </form>
-    <form method="post" action="/admin/email/disconnect" style="display:inline;margin-left:.5rem">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn" type="submit" onclick="return confirm('Disconnect Microsoft email? Form notifications will stop sending until you reconnect.')">Disconnect</button>
+      <button class="btn-primary" type="submit">Send test email</button>
     </form>
     <% if (notifyEmail) { %><p class="muted">Test and form notifications go to <code><%= notifyEmail %></code>.</p><% } %>
   <% } %>
