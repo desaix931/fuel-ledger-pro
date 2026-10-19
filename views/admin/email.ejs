@@ -20,6 +20,10 @@
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button class="btn-primary" type="submit">Send test email</button>
     </form>
+    <form method="post" action="/admin/email/check" style="margin-top:.5rem">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn" type="submit">Check Microsoft permissions</button>
+    </form>
     <% if (notifyEmail) { %><p class="muted">Test and form notifications go to <code><%= notifyEmail %></code>.</p><% } %>
   <% } %>
   <p class="muted">Sending method in use: <strong><%= mode === 'oauth' ? 'Microsoft sign-in (OAuth2)' : mode === 'smtp' ? 'SMTP username/password' : 'none configured' %></strong>. Notifications are always saved to the database even if email fails.</p>

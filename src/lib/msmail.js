@@ -83,8 +83,20 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-async function sendMail({ to, subject, text, attachments }) {
-  const nodemailer = require('nodemailer');
+// Reads the permission roles embedded in the app's access token, without
+// logging or exposing the token itself. Used by the Admin -> Email
+// "Check Microsoft permissions" diagnostic.
+async function tokenRoles() {
+  const token = await getAccessToken();
+  const segment = String(token).split('.')[1] || '';
+  let payload = {};
+  try {
+    payload = JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+  } catch (_) { /* not a JWT we can read */ }
+  return Array.isArray(payload.roles) ? payload.roles : [];
+}
+
+async function sendMail({ to, subject, text, attachments }) {  const nodemailer = require('nodemailer');
   const user = process.env.SMTP_USER;
   if (!user) throw new Error('Set SMTP_USER to the mailbox address (e.g. admin@desaixtransportllc.com).');
   const accessToken = await getAccessToken();
@@ -98,4 +110,4 @@ async function sendMail({ to, subject, text, attachments }) {
   await t.sendMail({ from, to, subject, text, attachments });
 }
 
-module.exports = { isEnvConfigured, getAccessToken, sendMail };
+module.exports = { isEnvConfigured, getAccessToken, tokenRoles, sendMail };
