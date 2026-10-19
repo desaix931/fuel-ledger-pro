@@ -14,7 +14,9 @@
 
 <details class="card noprint" style="margin-bottom:1rem">
   <summary style="cursor:pointer;font-weight:600">✉️ Email this ledger (PDF attached)</summary>
-  <% if (!emailConfigured) { %>
+  <% if (!ledgerEmailEnabled) { %>
+    <p class="muted">Emailing ledgers is disabled on this server.</p>
+  <% } else if (!emailConfigured) { %>
     <p class="muted">Email is not configured on this server. Set <code>SMTP_HOST</code> (plus
     <code>SMTP_USER</code>/<code>SMTP_PASS</code>/<code>SMTP_FROM</code>) in the environment and restart to enable it.</p>
   <% } else { %>

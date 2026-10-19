@@ -139,6 +139,12 @@ router.get('/', async (req, res) => {
   res.render('admin/ledger', { customers: customers.rows, sites: sites.rows });
 });
 
+// Ledger email is a separate opt-in: the shared SMTP mailbox is reserved for
+// form notifications unless LEDGER_EMAIL_ENABLED=true is set.
+function ledgerEmailEnabled() {
+  return String(process.env.LEDGER_EMAIL_ENABLED || '').toLowerCase() === 'true';
+}
+
 // --- Ledger preview ---
 router.get('/view', async (req, res) => {
   const customerId = parseInt(req.query.customer_id, 10);
@@ -153,6 +159,7 @@ router.get('/view', async (req, res) => {
   res.render('admin/ledger_view', {
     data, company, q, text: ledgerText(company, data),
     emailConfigured: mailer.isConfigured(),
+    ledgerEmailEnabled: ledgerEmailEnabled(),
     emailed: req.query.emailed || null,
     emailerr: req.query.emailerr || null,
     defaultSubject: `Fuel delivery ledger — ${data.customer.name} (${from || 'all'} to ${to || 'all'})`,
@@ -189,6 +196,7 @@ router.post('/email', requireCsrf, async (req, res) => {
     res.redirect(`/admin/ledger/view?${q}&${ok ? 'emailed' : 'emailerr'}=${encodeURIComponent(msg)}`);
 
   if (!customerId) return back('Missing customer.', false);
+  if (!ledgerEmailEnabled()) return back('Emailing ledgers is disabled on this server.', false);
   let recipients;
   try {
     recipients = mailer.parseRecipients(req.body.recipients);
