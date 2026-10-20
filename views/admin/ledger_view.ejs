@@ -8,15 +8,20 @@
     <button class="btn" type="button" id="copybtn">Copy as text</button>
     <button class="btn" type="button" onclick="window.print()">Print</button>
   </div>
+  <% if (blind) { %><p class="muted" style="margin-top:.5rem">Blind shipment version — the customer's name only; your company info is hidden on the printed ledger, PDF, and text.</p><% } %>
 </div>
 
 
 <div class="card">
+  <% if (blind) { %>
+  <h1 style="margin-bottom:0"><%= data.customer.name %></h1>
+  <% } else { %>
   <% if (company.company_name) { %><h1 style="margin-bottom:0"><%= company.company_name %></h1><% } %>
   <% if (company.company_phone || company.company_email) { %><div class="muted"><%= [company.company_phone, company.company_email].filter(Boolean).join(' · ') %></div><% } %>
   <% if (company.company_address) { %><div class="muted"><%= company.company_address %></div><% } %>
+  <% } %>
   <h2>Fuel Delivery Ledger</h2>
-  <p><strong>Customer:</strong> <%= data.customer.name %><br>
+  <p><% if (!blind) { %><strong>Customer:</strong> <%= data.customer.name %><br><% } %>
   <% if (data.site) { %><strong>Site:</strong> <%= data.site.name %><br><% } %>
   <strong>Period:</strong> <%= data.from || 'beginning' %> to <%= data.to || 'today' %></p>
   <div style="overflow-x:auto">

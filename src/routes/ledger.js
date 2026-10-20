@@ -40,16 +40,22 @@ async function ledgerData(customerId, from, to, siteId) {
   return { customer: cust.rows[0], fills: fills.rows, totals: totals.rows, byDriver: byDriver.rows, from, to, site: site.rows[0] || null };
 }
 
-function ledgerText(company, data) {
+// Blind shipment: the customer's name is the only identity on the document —
+// our company name, phone, email and address are left off entirely.
+function ledgerText(company, data, blind) {
   const L = [];
-  if (company.company_name) L.push(company.company_name);
-  if (company.company_phone || company.company_email) {
-    L.push([company.company_phone, company.company_email].filter(Boolean).join(' | '));
+  if (blind) {
+    L.push(data.customer.name);
+  } else {
+    if (company.company_name) L.push(company.company_name);
+    if (company.company_phone || company.company_email) {
+      L.push([company.company_phone, company.company_email].filter(Boolean).join(' | '));
+    }
+    if (company.company_address) L.push(company.company_address);
   }
-  if (company.company_address) L.push(company.company_address);
   L.push('');
   L.push('FUEL DELIVERY LEDGER');
-  L.push(`Customer: ${data.customer.name}`);
+  if (!blind) L.push(`Customer: ${data.customer.name}`);
   if (data.site) L.push(`Site: ${data.site.name}`);
   L.push(`Period: ${data.from || 'beginning'} to ${data.to || 'today'}`);
   L.push('');
@@ -73,8 +79,10 @@ function ledgerText(company, data) {
   return L.join('\n');
 }
 
-// Build the ledger PDF into a Buffer (shared by download + email).
-function buildLedgerPdf(company, data, from, to) {
+// Build the ledger PDF into a Buffer.
+// Blind shipment (blind=true): header is the customer's name only —
+// no company name or contact info anywhere on the document.
+function buildLedgerPdf(company, data, from, to, blind) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 48, size: 'LETTER' });
     const chunks = [];
@@ -82,12 +90,17 @@ function buildLedgerPdf(company, data, from, to) {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    if (company.company_name) doc.fontSize(18).text(company.company_name);
-    doc.fontSize(10).fillColor('#444');
-    [company.company_phone, company.company_email, company.company_address].filter(Boolean)
-      .forEach((l) => doc.text(l));
+    if (blind) {
+      doc.fontSize(18).text(data.customer.name);
+    } else {
+      if (company.company_name) doc.fontSize(18).text(company.company_name);
+      doc.fontSize(10).fillColor('#444');
+      [company.company_phone, company.company_email, company.company_address].filter(Boolean)
+        .forEach((l) => doc.text(l));
+    }
     doc.moveDown().fillColor('#000').fontSize(14).text('Fuel Delivery Ledger');
-    doc.fontSize(10).text(`Customer: ${data.customer.name}`);
+    doc.fontSize(10);
+    if (!blind) doc.text(`Customer: ${data.customer.name}`);
     if (data.site) doc.text(`Site: ${data.site.name}`);
     doc.text(`Period: ${from || 'beginning'} to ${to || 'today'}`);
     doc.moveDown();
@@ -144,13 +157,14 @@ router.get('/view', async (req, res) => {
   const from = String(req.query.from || '').slice(0, 10);
   const to = String(req.query.to || '').slice(0, 10);
   const siteId = parseInt(req.query.site_id, 10) || null;
+  const blind = req.query.blind === '1';
   if (!customerId) return res.redirect('/admin/ledger');
   const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
   const company = await companyInfo();
-  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${siteId ? `&site_id=${siteId}` : ''}`;
+  const q = `customer_id=${customerId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${siteId ? `&site_id=${siteId}` : ''}${blind ? '&blind=1' : ''}`;
   res.render('admin/ledger_view', {
-    data, company, q, text: ledgerText(company, data),
+    data, company, q, blind, text: ledgerText(company, data, blind),
   });
 });
 
@@ -160,6 +174,7 @@ router.get('/pdf', async (req, res) => {
   const from = String(req.query.from || '').slice(0, 10);
   const to = String(req.query.to || '').slice(0, 10);
   const siteId = parseInt(req.query.site_id, 10) || null;
+  const blind = req.query.blind === '1';
   if (!customerId) return res.status(400).send('Missing customer.');
   const data = await ledgerData(customerId, from, to, siteId);
   if (!data.customer) return res.status(404).send('Customer not found.');
@@ -167,7 +182,7 @@ router.get('/pdf', async (req, res) => {
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${ledgerFilename(data, from, to, 'pdf')}"`);
-  const pdf = await buildLedgerPdf(company, data, from, to);
+  const pdf = await buildLedgerPdf(company, data, from, to, blind);
   res.send(pdf);
 });
 
