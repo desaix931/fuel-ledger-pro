@@ -3,7 +3,7 @@ const express = require('express');
 const pool = require('../db');
 const { requireLogin, requireCsrf } = require('../middleware');
 const { FUEL_TYPES, toInputDateTime, todayStr } = require('../lib');
-const { bolUploadFields, validateBolDocs, formLookups, validateFill, driverPickerLocals, resolveFillDriver } = require('../fillForm');
+const { bolUploadFields, validateBolDocs, formLookups, validateFill, refilledForm, driverPickerLocals, resolveFillDriver } = require('../fillForm');
 
 // View chrome for the shared fill form (driver URLs). Admins (managers who
 // also drive) can use the same form; their cancel/save lands back in the
@@ -98,7 +98,7 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
   const picker = await driverPickerLocals(res.locals.user);
   const renderForm = async (errs) => {
     const lookups = await formLookups();
-    return res.status(400).render('driver/fill_form', { lookups, errors: errs, form: req.body, editing: null, ...driverChrome(null, res.locals.user), ...picker });
+    return res.status(400).render('driver/fill_form', { lookups, errors: errs, form: refilledForm(req.body), editing: null, ...driverChrome(null, res.locals.user), ...picker });
   };
   if (allErrors.length) return renderForm(allErrors);
   // Verify customer/site exist and are active (and site belongs to customer).
@@ -180,7 +180,7 @@ router.post('/fills/:id/edit', bolUploadFields, requireCsrf, async (req, res) =>
     const lookups = await formLookups();
     const docs = await pool.query(
       'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
-    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: rows[0], ...driverChrome(req.params.id, res.locals.user), bolDocs: docs.rows });
+    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: refilledForm(req.body), editing: rows[0], ...driverChrome(req.params.id, res.locals.user), bolDocs: docs.rows });
   }
   // Update the fill + append new BOL photos atomically.
   const client = await pool.connect();

@@ -14,6 +14,7 @@
   <input type="hidden" name="location_accuracy" id="fill_acc">
   <% } %>
   <p id="gpsbadge" class="muted" style="display:none;font-size:.85rem">📍 Location captured</p>
+  <input type="hidden" name="_tz_offset" id="_tz_offset">
 
   <% if (isAdmin && drivers && drivers.length) { %>
   <div class="card">
@@ -92,7 +93,7 @@
       <% }) %>
     </div>
     <label>Date &amp; time
-      <input type="datetime-local" name="filled_at" required value="<%= form.filled_at || '' %>">
+      <input type="datetime-local" name="filled_at" id="filled_at" required value="<%= form.filled_at || '' %>">
     </label>
     <label>Notes (optional)
       <textarea name="notes" maxlength="2000" placeholder="Meter readings, issues, etc."><%= form.notes || '' %></textarea>
@@ -156,6 +157,22 @@
   ft.addEventListener('change', function () {
     cfw.style.display = ft.value === '__custom' ? 'block' : 'none';
   });
+
+  // Date & time: the server renders filled_at in UTC; show it in the viewer's
+  // local time, and tell the server our offset so it can convert back on
+  // submit. Without this, drivers see a UTC clock (hours ahead) and "fixing"
+  // it silently shifts the stored time.
+  (function () {
+    var dt = document.getElementById('filled_at'),
+        tz = document.getElementById('_tz_offset');
+    if (tz) tz.value = new Date().getTimezoneOffset();
+    if (!dt || !dt.value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dt.value)) return;
+    var asUtc = new Date(dt.value + ':00Z');
+    if (Number.isNaN(asUtc.getTime())) return;
+    function p(n) { return String(n).padStart(2, '0'); }
+    dt.value = asUtc.getFullYear() + '-' + p(asUtc.getMonth() + 1) + '-' + p(asUtc.getDate()) +
+               'T' + p(asUtc.getHours()) + ':' + p(asUtc.getMinutes());
+  })();
 
   // GPS: capture the phone's location when a new fill is logged. Optional —
   // the fill saves fine without it. Skipped when logging on behalf of another
