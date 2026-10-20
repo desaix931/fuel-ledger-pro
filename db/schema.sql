@@ -207,3 +207,14 @@ CREATE INDEX IF NOT EXISTS idx_fills_customer  ON fills (customer_id);
 CREATE INDEX IF NOT EXISTS idx_fills_driver    ON fills (driver_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_date       ON jobs (scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_jobs_driver     ON jobs (driver_id);
+
+-- Quick-pick values removed from the fill form's tap-to-reuse chips (the × on
+-- a chip). hidden_through is the value's most recent fill time at dismissal;
+-- the chip comes back on its own if a newer fill uses the value again.
+CREATE TABLE IF NOT EXISTS hidden_suggestions (
+  kind           TEXT NOT NULL CHECK (kind IN ('equipment', 'bol')),
+  value          TEXT NOT NULL,
+  hidden_through TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (kind, value)
+);

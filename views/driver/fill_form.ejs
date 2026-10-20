@@ -53,7 +53,7 @@
       <div class="muted" style="font-size:.85rem">Tap to reuse:</div>
       <div class="chips" id="eqchips">
         <% lookups.recentEquipment.forEach((e) => { %>
-          <button type="button" class="chip" data-eq="<%= e %>"><%= e %></button>
+          <button type="button" class="chip" data-eq="<%= e %>"><%= e %><span class="chipx" data-del data-kind="equipment" data-val="<%= e %>" title="Remove from quick pick">×</span></button>
         <% }) %>
       </div>
     <% } %>
@@ -65,7 +65,7 @@
       <div class="muted" style="font-size:.85rem">Tap to reuse:</div>
       <div class="chips" id="bolchips">
         <% lookups.recentBolNumbers.forEach((b) => { %>
-          <button type="button" class="chip" data-bol="<%= b %>"><%= b %></button>
+          <button type="button" class="chip" data-bol="<%= b %>"><%= b %><span class="chipx" data-del data-kind="bol" data-val="<%= b %>" title="Remove from quick pick">×</span></button>
         <% }) %>
       </div>
     <% } %>
@@ -143,10 +143,22 @@
     if (site.selectedOptions[0] && site.selectedOptions[0].hidden) site.value = '';
   }
   cust.addEventListener('change', filterSites); filterSites();
+  function dismissChip(x) {
+    var chip = x.closest('.chip');
+    var body = new URLSearchParams();
+    body.set('_csrf', '<%= csrfToken %>');
+    body.set('kind', x.getAttribute('data-kind'));
+    body.set('value', x.getAttribute('data-val'));
+    fetch('/driver/fills/suggestions/dismiss', { method: 'POST', body: body })
+      .then(function (r) { if (r.ok && chip) chip.remove(); })
+      .catch(function () { /* offline — chip stays; it can be removed next time */ });
+  }
   document.getElementById('eqchips')?.addEventListener('click', function (e) {
+    var x = e.target.closest('[data-del]'); if (x) { dismissChip(x); return; }
     var b = e.target.closest('[data-eq]'); if (b) eq.value = b.getAttribute('data-eq');
   });
   document.getElementById('bolchips')?.addEventListener('click', function (e) {
+    var x = e.target.closest('[data-del]'); if (x) { dismissChip(x); return; }
     var b = e.target.closest('[data-bol]'); if (b) document.getElementById('bolnumber').value = b.getAttribute('data-bol');
   });
   document.getElementById('galpad').addEventListener('click', function (e) {

@@ -63,7 +63,7 @@ function validateBolDocs(files) {
 }
 
 async function formLookups() {
-  const [customers, sites, equipment, recentEq, recentBol] = await Promise.all([
+  const [customers, sites, equipment, recentEq, recentBol, hidden] = await Promise.all([
     pool.query("SELECT id, name FROM customers WHERE active ORDER BY name"),
     pool.query(`SELECT s.id, s.name, s.customer_id, c.name AS customer_name
                 FROM sites s JOIN customers c ON c.id = s.customer_id
@@ -75,13 +75,24 @@ async function formLookups() {
     pool.query(`SELECT bol_number, MAX(filled_at) AS m FROM fills
                 WHERE bol_number IS NOT NULL AND bol_number <> ''
                 GROUP BY bol_number ORDER BY m DESC LIMIT 10`),
+    pool.query(`SELECT kind, value, hidden_through FROM hidden_suggestions`),
   ]);
+  // A value dismissed with a chip's × stays hidden until a fill newer than
+  // the dismissal uses it again — then it's genuinely back in rotation.
+  const hiddenThrough = new Map(hidden.rows.map((h) => [JSON.stringify([h.kind, h.value]), h.hidden_through]));
+  const dismissed = (kind, value, m) => {
+    const key = JSON.stringify([kind, value]);
+    if (!hiddenThrough.has(key)) return false;
+    const t = hiddenThrough.get(key);
+    if (t == null || !m) return true;
+    return new Date(m) <= new Date(t);
+  };
   return {
     customers: customers.rows,
     sites: sites.rows,
     equipment: equipment.rows,
-    recentEquipment: recentEq.rows.map((r) => r.equipment_label),
-    recentBolNumbers: recentBol.rows.map((r) => r.bol_number),
+    recentEquipment: recentEq.rows.filter((r) => !dismissed('equipment', r.equipment_label, r.m)).map((r) => r.equipment_label),
+    recentBolNumbers: recentBol.rows.filter((r) => !dismissed('bol', r.bol_number, r.m)).map((r) => r.bol_number),
   };
 }
 

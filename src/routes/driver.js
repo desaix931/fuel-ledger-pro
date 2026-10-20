@@ -141,6 +141,24 @@ router.post('/fills', bolUploadFields, requireCsrf, async (req, res) => {
   res.redirect(afterSaveUrl(res.locals.user));
 });
 
+// Remove a value from the fill form's tap-to-reuse chips (the × on a chip:
+// equipment labels and BOL numbers). The fills themselves are untouched —
+// the value just stops being offered, until a newer fill uses it again.
+// Shared by drivers and office: both use this same form.
+router.post('/fills/suggestions/dismiss', requireCsrf, async (req, res) => {
+  const kind = req.body.kind === 'bol' ? 'bol' : req.body.kind === 'equipment' ? 'equipment' : null;
+  const value = String(req.body.value || '').trim().slice(0, 120);
+  if (!kind || !value) return res.status(400).json({ ok: false });
+  const col = kind === 'bol' ? 'bol_number' : 'equipment_label';
+  const { rows } = await pool.query(`SELECT MAX(filled_at) AS m FROM fills WHERE ${col} = $1`, [value]);
+  await pool.query(
+    `INSERT INTO hidden_suggestions (kind, value, hidden_through) VALUES ($1, $2, $3)
+     ON CONFLICT (kind, value) DO UPDATE SET hidden_through = EXCLUDED.hidden_through`,
+    [kind, value, rows.length ? rows[0].m : null]
+  );
+  res.json({ ok: true });
+});
+
 // --- Edit own fill ---
 router.get('/fills/:id/edit', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM fills WHERE id = $1 AND driver_id = $2', [req.params.id, res.locals.user.id]);

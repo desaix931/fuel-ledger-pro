@@ -52,6 +52,7 @@ table.grid th { color: var(--muted); font-weight: 600; font-size: .8rem; text-tr
 .chip { border: 1px solid var(--line); background: #eef3f7; border-radius: 999px;
   padding: .55rem .95rem; font-size: .95rem; cursor: pointer; }
 .chip:active { background: #dbe7f1; }
+.chipx { margin-left: .45rem; padding: 0 .15rem; font-weight: 700; opacity: .45; }
 .galpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: .5rem 0; }
 .galpad button { padding: .8rem .4rem; font-weight: 700; font-size: 1.05rem; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .7rem; }
