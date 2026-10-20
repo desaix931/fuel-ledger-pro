@@ -3,7 +3,7 @@
 // their own fills) and the admin routes (office can edit any fill).
 const multer = require('multer');
 const pool = require('./db');
-const { parseLocalDateTime, parseClientDateTime, toUtcInput } = require('./lib');
+const { parseLocalDateTime } = require('./lib');
 
 // BOL photos: kept in memory and stored as bytea in Postgres
 // (Render's container disk is ephemeral, so disk storage would lose them).
@@ -112,10 +112,7 @@ function validateFill(body) {
   if (!Number.isFinite(gallons) || gallons <= 0) errors.push('Gallons must be a positive number.');
   if (gallons >= 100000) errors.push('Gallons looks too large.');
 
-  // The browser submits datetime-local in the DRIVER's local time; convert back
-  // to the UTC-wall representation the fills table stores. _tz_offset comes
-  // from a hidden field the form's script fills in (getTimezoneOffset()).
-  let filledAt = parseClientDateTime(String(body.filled_at || ''), body._tz_offset);
+  let filledAt = parseLocalDateTime(String(body.filled_at || ''));
   if (!filledAt) {
     if (!String(body.filled_at || '').trim()) filledAt = new Date(); // empty = now
     else errors.push('Enter a valid date and time.');
@@ -151,18 +148,7 @@ function validateFill(body) {
     locationAccuracy: Number.isNaN(locationAccuracy) ? null : locationAccuracy } };
 }
 
-// For validation-error re-renders: take the submitted body and put the
-// filled_at value back into the UTC-wall form the template expects (its
-// script converts UTC-wall to the viewer's local time on load). Keeps one
-// code path in the template instead of a "was this already converted" flag.
-function refilledForm(body) {
-  const d = parseClientDateTime(String(body.filled_at || ''), body._tz_offset);
-  const form = Object.assign({}, body);
-  if (d) form.filled_at = toUtcInput(d);
-  return form;
-}
-
-module.exports = { bolUploadFields, validateBolDocs, formLookups, validateFill, refilledForm };
+module.exports = { bolUploadFields, validateBolDocs, formLookups, validateFill };
 
 // For admins logging a fill on someone's behalf: the "who did this fill"
 // picker. Returns { isAdmin, drivers } for the form view. Drivers get an

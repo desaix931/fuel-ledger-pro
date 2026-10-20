@@ -16,27 +16,6 @@ function parseLocalDateTime(s) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-// Interprets a datetime-local wall time entered in the CLIENT's timezone and
-// returns the equivalent UTC-wall Date, matching how filled_at is stored.
-// tzOffsetMin is the browser's Date#getTimezoneOffset() (minutes behind UTC;
-// e.g. 240 for EDT). Falls back to the legacy UTC interpretation when the
-// offset is missing or invalid (old cached pages).
-function parseClientDateTime(s, tzOffsetMin) {
-  const d = parseLocalDateTime(s);
-  if (!d) return null;
-  const off = Number(tzOffsetMin);
-  if (!Number.isFinite(off) || Math.abs(off) > 840) return d;
-  return new Date(d.getTime() + off * 60000);
-}
-
-// Formats a Date as "YYYY-MM-DDTHH:mm" using UTC components — the inverse of
-// parseClientDateTime's output, safe regardless of the server's TZ setting.
-function toUtcInput(d) {
-  const dt = new Date(d);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${dt.getUTCFullYear()}-${p(dt.getUTCMonth() + 1)}-${p(dt.getUTCDate())}T${p(dt.getUTCHours())}:${p(dt.getUTCMinutes())}`;
-}
-
 // Formats a Date/db timestamp as "YYYY-MM-DDTHH:mm" for datetime-local inputs.
 function toInputDateTime(d) {
   const dt = new Date(d);
@@ -79,6 +58,6 @@ function passwordError(pw) {
 }
 
 module.exports = {
-  FUEL_TYPES, isEmail, parseLocalDateTime, parseClientDateTime, toUtcInput, toInputDateTime,
+  FUEL_TYPES, isEmail, parseLocalDateTime, toInputDateTime,
   fmtDateTime, fmtDate, fmtGal, csvCell, todayStr, passwordError,
 };

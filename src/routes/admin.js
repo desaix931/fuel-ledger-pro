@@ -7,7 +7,7 @@ const { parse } = require('csv-parse/sync');
 const pool = require('../db');
 const { requireAdmin, requireCsrf } = require('../middleware');
 const { isEmail, csvCell, todayStr, FUEL_TYPES, toInputDateTime, passwordError } = require('../lib');
-const { bolUploadFields, validateBolDocs, formLookups, validateFill, refilledForm, driverPickerLocals, resolveFillDriver } = require('../fillForm');
+const { bolUploadFields, validateBolDocs, formLookups, validateFill, driverPickerLocals, resolveFillDriver } = require('../fillForm');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -157,7 +157,7 @@ router.post('/entries/:id/edit', bolUploadFields, requireCsrf, async (req, res) 
     const docs = await pool.query(
       'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
     return res.status(400).render('driver/fill_form', {
-      lookups, errors: allErrors, form: refilledForm(req.body), editing: rows[0], bolDocs: docs.rows,
+      lookups, errors: allErrors, form: req.body, editing: rows[0], bolDocs: docs.rows,
       formAction: '/admin/entries/' + req.params.id + '/edit', cancelUrl: '/admin/entries', docBase: '/admin/entries',
       ...picker,
     });
