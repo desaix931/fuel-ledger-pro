@@ -176,9 +176,10 @@ async function sendMail({ to, subject, text, html, attachments }) {
   try {
     await graphSend(await getAccessToken(), from, payload);
   } catch (e) {
-    // The cached token may predate a permission grant — fetch a fresh one
-    // and retry once before giving up.
-    if (e.status !== 401) throw e;
+    // 401: the cached token is no good. 403: it may have been minted before
+    // a permission grant finished propagating, so its roles are stale.
+    // Either way, fetch a fresh token and retry once before giving up.
+    if (e.status !== 401 && e.status !== 403) throw e;
     await graphSend(await getAccessToken({ fresh: true }), from, payload);
   }
 }
