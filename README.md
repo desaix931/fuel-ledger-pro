@@ -91,15 +91,18 @@ admin Applications / DOT Packages inboxes show whether the notification went out
 
 Plain-password SMTP AUTH stops working when the Microsoft 365 tenant enforces
 MFA / Security Defaults (Microsoft blocks legacy auth, and app passwords are
-not offered under Security Defaults). The app then authenticates as itself
-and sends through `smtp.office365.com` using OAuth2 client credentials:
+not offered under Security Defaults). OAuth2 SMTP (SMTP.SendAsApp) gets one
+step further but still needs an Exchange Online PowerShell step to register
+the app before Exchange accepts it. The app therefore authenticates as itself
+and sends through Microsoft Graph (`POST /users/{mailbox}/sendMail`) using
+OAuth2 client credentials:
 
   1. Entra admin center → Identity → Applications → App registrations →
      New registration. Name `Fuel Ledger Mail`, single tenant (no redirect
      URI needed).
-  2. API permissions → Add a permission → "APIs my organization uses" →
-     Office 365 Exchange Online → Application permissions →
-     check `SMTP.SendAsApp` → Add permissions → Grant admin consent.
+  2. API permissions → Add a permission → Microsoft Graph →
+     Application permissions → check `Mail.Send` → Add permissions →
+     Grant admin consent.
   3. Certificates & secrets → New client secret → copy the secret **value**.
   4. Set on Render: `MS_CLIENT_ID`, `MS_TENANT_ID`, `MS_CLIENT_SECRET`.
   5. In the app: Admin → Email → **Send test email** to verify.

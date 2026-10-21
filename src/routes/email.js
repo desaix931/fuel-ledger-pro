@@ -1,6 +1,6 @@
 'use strict';
-// Admin -> Email: status of the Microsoft 365 mail connection (OAuth2
-// application permission) + one-click test.
+// Admin -> Email: status of the Microsoft 365 mail connection (Microsoft
+// Graph sendMail, OAuth2 application permission) + one-click test.
 const express = require('express');
 const { requireAdmin, requireCsrf } = require('../middleware');
 const mailer = require('../lib/mailer');
@@ -21,18 +21,18 @@ router.get('/', async (req, res) => {
 });
 
 // Diagnostic: reads the permission roles inside the app's access token
-// (never logs the token) so we can tell a consent problem apart from an
-// Exchange-side propagation delay.
+// (never logs the token) so we can tell a missing/consent problem apart
+// from a plain propagation delay.
 router.post('/check', requireCsrf, async (req, res) => {
   try {
     const roles = await msmail.tokenRoles();
-    if (roles.includes('SMTP.SendAsApp')) {
+    if (roles.includes('Mail.Send')) {
       return res.redirect('/admin/email?ok=' + encodeURIComponent(
-        'Microsoft issued a token WITH the SMTP.SendAsApp permission. If sending still fails, the permission is still propagating to the mail servers — wait about 30 minutes and hit "Send test email" again.'
+        'Microsoft issued a token WITH the Mail.Send permission. Sending goes through Microsoft Graph, so no Exchange-side setup is needed — hit "Send test email" to verify.'
       ));
     }
     return res.redirect('/admin/email?err=' + encodeURIComponent(
-      `Token is fine, but it does NOT include the SMTP.SendAsApp permission (token carries: ${roles.join(', ') || 'no permissions'}). In Entra, open the app → API permissions → make sure SMTP.SendAsApp shows "Granted", then try again.`
+      `Token is fine, but it does NOT include the Mail.Send permission (token carries: ${roles.join(', ') || 'no permissions'}). In Entra, open the app → API permissions → Microsoft Graph → make sure the Mail.Send application permission shows "Granted", then try again.`
     ));
   } catch (e) {
     return res.redirect('/admin/email?err=' + encodeURIComponent('Permission check failed: ' + e.message));

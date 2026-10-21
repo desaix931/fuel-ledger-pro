@@ -1,6 +1,6 @@
 <% const title = 'Email'; %>
 <h1>Email</h1>
-<p class="muted">Connects the office Microsoft 365 mailbox so driver applications and DOT packages notify the office by email. Uses Microsoft's modern sign-in (OAuth2 application permission) — works even when the tenant blocks plain-password SMTP.</p>
+<p class="muted">Connects the office Microsoft 365 mailbox so driver applications and DOT packages notify the office by email. Sends through Microsoft Graph with an OAuth2 application permission — no mailbox password involved, and it works even when the tenant blocks plain-password SMTP.</p>
 <% if (ok) { %><div class="alert ok"><%= ok %></div><% } %>
 <% if (err) { %><div class="alert err"><%= err %></div><% } %>
 
@@ -10,12 +10,12 @@
     <p><strong>Not set up yet.</strong> The server needs the Microsoft app credentials first. In the Microsoft Entra admin center:</p>
     <ol>
       <li><strong>Identity → Applications → App registrations → New registration.</strong> Name it <code>Fuel Ledger Mail</code>, single tenant. (No redirect URI needed.)</li>
-      <li><strong>API permissions → Add a permission → "APIs my organization uses" → Office 365 Exchange Online → Application permissions</strong> → check <strong>SMTP.SendAsApp</strong> → Add permissions, then <strong>Grant admin consent</strong>.</li>
+      <li><strong>API permissions → Add a permission → Microsoft Graph → Application permissions</strong> → check <strong>Mail.Send</strong> → Add permissions, then <strong>Grant admin consent</strong>.</li>
       <li><strong>Certificates &amp; secrets → New client secret</strong> → copy the secret <strong>value</strong> (not the ID). Also copy the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong> from the app's Overview page.</li>
       <li>On Render (service → Environment), set <code>MS_CLIENT_ID</code>, <code>MS_TENANT_ID</code> and <code>MS_CLIENT_SECRET</code> to those three values, then come back here and send a test.</li>
     </ol>
   <% } else { %>
-    <p><strong>Ready ✓</strong> — the app authenticates to Microsoft 365 as itself and sends as the office mailbox.</p>
+    <p><strong>Ready ✓</strong> — the app authenticates to Microsoft 365 as itself and sends as the office mailbox via Microsoft Graph.</p>
     <form method="post" action="/admin/email/test">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button class="btn-primary" type="submit">Send test email</button>
@@ -26,5 +26,5 @@
     </form>
     <% if (notifyEmail) { %><p class="muted">Test and form notifications go to <code><%= notifyEmail %></code>.</p><% } %>
   <% } %>
-  <p class="muted">Sending method in use: <strong><%= mode === 'oauth' ? 'Microsoft sign-in (OAuth2)' : mode === 'smtp' ? 'SMTP username/password' : 'none configured' %></strong>. Notifications are always saved to the database even if email fails.</p>
+  <p class="muted">Sending method in use: <strong><%= mode === 'oauth' ? 'Microsoft Graph (OAuth2)' : mode === 'smtp' ? 'SMTP username/password' : 'none configured' %></strong>. Notifications are always saved to the database even if email fails.</p>
 </div>
