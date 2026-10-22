@@ -1,7 +1,7 @@
 <h1><%= title %></h1>
 <% if (error) { %><p class="alert err"><%= error %></p><% } %>
 <div class="card">
-  <form method="post" action="<%= action %>">
+  <form method="post" action="<%= action %>"<% if (action === '/fleet') { %> enctype="multipart/form-data"<% } %>>
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <h2 style="margin-top:0">Unit</h2>
     <div class="filters">
@@ -30,6 +30,15 @@
       <label>Next due date <input type="date" name="inspection_due_date" value="<%= unit ? unit.inspection_due_date || '' : '' %>"></label>
     </div>
     <p class="muted">Leave “Next due” blank and it is set automatically to one year after the last inspection — that date drives the inspection reminders.</p>
+    <% if (action === '/fleet') { %>
+    <h2>Paperwork (optional)</h2>
+    <div class="filters">
+      <label>Category <select name="category">
+        <% categories.forEach((c) => { %><option value="<%= c %>"><%= c %></option><% }) %></select></label>
+      <label>Files (PDF or photo, up to 5, 15 MB each) <input type="file" name="documents" accept="application/pdf,image/jpeg,image/png,image/webp" multiple></label>
+    </div>
+    <p class="muted">Attach the registration, insurance card, or annual inspection report right now — or skip this and add paperwork later from the unit's Paperwork tab.</p>
+    <% } %>
     <h2>Notes</h2>
     <label style="display:block">Notes <textarea name="notes" rows="3" maxlength="2000" style="width:100%"><%= unit ? unit.notes || '' : '' %></textarea></label>
     <p><button class="btn-primary" type="submit">Save unit</button>

@@ -63,7 +63,8 @@
       <td><a href="/fleet/units/<%= unit.id %>/documents/<%= d.id %>" target="_blank" rel="noopener"><%= d.filename %></a>
         <span class="muted">(<%= Math.max(1, Math.round(d.size_bytes / 1024)) %> KB)</span></td>
       <td class="muted"><%= fmtDate(d.created_at) %><%= d.uploader ? ' · ' + d.uploader : '' %></td>
-      <td><% if (isAdmin) { %><form method="post" action="/fleet/units/<%= unit.id %>/documents/<%= d.id %>/delete" class="inline" onsubmit="return confirm('Delete <%= d.filename %>? This cannot be undone.')">
+      <td style="white-space:nowrap"><button class="btn btn-sm" type="button" onclick="shareDoc(this)" data-url="/fleet/units/<%= unit.id %>/documents/<%= d.id %>" data-name="<%= d.filename %>">Share</button>
+      <% if (isAdmin) { %><form method="post" action="/fleet/units/<%= unit.id %>/documents/<%= d.id %>/delete" class="inline" onsubmit="return confirm('Delete <%= d.filename %>? This cannot be undone.')">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-sm btn-danger" type="submit">Delete</button></form><% } %></td>
     </tr>
     <% }) %>
@@ -105,3 +106,31 @@
 <% } %>
 
 <p><a href="/fleet">← Back to Fleet Equipment</a></p>
+<script>
+// Share a paperwork document with the phone's share sheet (Messages, Mail,
+// AirDrop, ...). Sends the actual file when the browser supports file
+// sharing; falls back to sharing the link, then to just opening it.
+async function shareDoc(btn) {
+  var url = btn.getAttribute('data-url');
+  var name = btn.getAttribute('data-name') || 'document';
+  var full = new URL(url, window.location.origin).href;
+  try {
+    var resp = await fetch(url);
+    if (!resp.ok) throw new Error('fetch failed');
+    var blob = await resp.blob();
+    var file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: name });
+      return;
+    }
+    throw new Error('file sharing not supported');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // user closed the share sheet
+    if (navigator.share) {
+      try { await navigator.share({ title: name, url: full }); return; }
+      catch (e2) { if (e2 && e2.name === 'AbortError') return; }
+    }
+    window.open(url, '_blank');
+  }
+}
+</script>

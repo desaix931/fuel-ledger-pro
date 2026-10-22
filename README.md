@@ -36,7 +36,11 @@ description). Each unit page has tabs:
 - **Paperwork** — the unit's document folder (registration, insurance,
   annual inspection reports, title, lease, maintenance). Files are PDFs or
   photos, stored as bytea in Postgres like BOL photos and validated by
-  magic bytes (15 MB max each, 5 per upload).
+  magic bytes (15 MB max each, 5 per upload). Documents can be attached
+  while adding the unit, or later from this tab. Every document has a
+  **Share** button that hands the actual file to the phone's share sheet
+  (Messages, Mail, AirDrop…) where the browser supports file sharing,
+  falling back to a link.
 - **Inspection** — last annual inspection date and next due date. Entering a
   last-inspection date auto-sets the due date one year out; "Record a
   completed inspection" rolls it forward another year.

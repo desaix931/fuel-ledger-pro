@@ -123,6 +123,36 @@ function uploadDocs(req, res, next) {
   });
 }
 
+// Same upload, but for the Add Unit form (no unit exists yet to redirect to).
+function uploadDocsForCreate(req, res, next) {
+  docUpload.array('documents', 5)(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE'
+        ? 'One of those files is over 15 MB — paperwork uploads max out at 15 MB each. The unit was not added.'
+        : 'Those files could not be accepted — paperwork must be a PDF or a photo (JPG, PNG, or WebP), up to 5 files at a time. The unit was not added.';
+      return res.redirect(`/fleet/new?error=${encodeURIComponent(msg)}`);
+    }
+    return next();
+  });
+}
+
+// Saves the valid files from an upload as a unit's paperwork. Returns counts.
+async function saveDocuments(unitId, files, category, userId) {
+  let saved = 0;
+  let rejected = 0;
+  for (const f of files || []) {
+    const sniffed = sniffDocMime(f.buffer);
+    if (!sniffed || f.size > 15 * 1024 * 1024) { rejected += 1; continue; }
+    await pool.query(
+      `INSERT INTO fleet_documents (unit_id, category, filename, mimetype, size_bytes, data, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [unitId, category, f.originalname.slice(0, 200), sniffed, f.size, f.buffer, userId]
+    );
+    saved += 1;
+  }
+  return { saved, rejected };
+}
+
 // --- list + search + inspection reminders ---
 router.get('/', requireLogin, async (req, res) => {
   const user = currentUser(req);
@@ -167,31 +197,43 @@ router.get('/', requireLogin, async (req, res) => {
   });
 });
 
-// --- add a unit (admin) ---
+// --- add a unit (admin); paperwork can be attached in the same step ---
 router.get('/new', requireAdmin, (req, res) => {
   res.render('fleet/form', {
-    title: 'Add Fleet Unit', unit: null, error: null,
-    unitTypes: UNIT_TYPES, action: '/fleet',
+    title: 'Add Fleet Unit', unit: null, error: req.query.error || null,
+    unitTypes: UNIT_TYPES, categories: DOC_CATEGORIES, action: '/fleet',
   });
 });
 
-router.post('/', requireAdmin, requireCsrf, async (req, res) => {
+router.post('/', requireAdmin, uploadDocsForCreate, requireCsrf, async (req, res) => {
   const unit = parseUnitForm(req.body);
+  const fileNote = (req.files && req.files.length)
+    ? ' Any files you picked were not saved — attach them from the unit’s Paperwork tab.'
+    : '';
   if (!unit.unit_number) {
     return res.status(400).render('fleet/form', {
-      title: 'Add Fleet Unit', unit, error: 'Unit number is required.',
-      unitTypes: UNIT_TYPES, action: '/fleet',
+      title: 'Add Fleet Unit', unit, error: 'Unit number is required.' + fileNote,
+      unitTypes: UNIT_TYPES, categories: DOC_CATEGORIES, action: '/fleet',
     });
   }
   try {
     const { rows } = await pool.query(UNIT_INSERT, unitParams(unit));
-    return res.redirect(`/fleet/units/${rows[0].id}?notice=${encodeURIComponent(`Unit ${unit.unit_number} added.`)}`);
+    const unitId = rows[0].id;
+    if (req.files && req.files.length) {
+      const category = DOC_CATEGORIES.includes(req.body.category) ? req.body.category : 'Other';
+      const { saved, rejected } = await saveDocuments(unitId, req.files, category, currentUser(req).id);
+      const note = saved
+        ? `Unit ${unit.unit_number} added with ${saved} document${saved === 1 ? '' : 's'}.${rejected ? ` ${rejected} file(s) were skipped (not a PDF or photo).` : ''}`
+        : `Unit ${unit.unit_number} added, but no documents were saved — the files must be PDFs or photos (JPG, PNG, WebP).`;
+      return res.redirect(`/fleet/units/${unitId}?tab=paperwork&${saved ? 'notice' : 'error'}=${encodeURIComponent(note)}`);
+    }
+    return res.redirect(`/fleet/units/${unitId}?notice=${encodeURIComponent(`Unit ${unit.unit_number} added.`)}`);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(400).render('fleet/form', {
         title: 'Add Fleet Unit', unit,
-        error: `Unit number "${unit.unit_number}" is already in use — pick the unit from the list to edit it.`,
-        unitTypes: UNIT_TYPES, action: '/fleet',
+        error: `Unit number "${unit.unit_number}" is already in use — pick the unit from the list to edit it.` + fileNote,
+        unitTypes: UNIT_TYPES, categories: DOC_CATEGORIES, action: '/fleet',
       });
     }
     throw err;
@@ -234,7 +276,7 @@ router.post('/units/:id/edit', requireAdmin, requireCsrf, async (req, res) => {
   if (!unit.unit_number) {
     return res.status(400).render('fleet/form', {
       title: `Edit Unit ${existing.unit_number}`, unit: { ...unit, id: existing.id },
-      error: 'Unit number is required.', unitTypes: UNIT_TYPES,
+      error: 'Unit number is required.', unitTypes: UNIT_TYPES, categories: DOC_CATEGORIES,
       action: `/fleet/units/${existing.id}/edit`,
     });
   }
@@ -245,7 +287,7 @@ router.post('/units/:id/edit', requireAdmin, requireCsrf, async (req, res) => {
       return res.status(400).render('fleet/form', {
         title: `Edit Unit ${existing.unit_number}`, unit: { ...unit, id: existing.id },
         error: `Unit number "${unit.unit_number}" is already in use by another unit.`,
-        unitTypes: UNIT_TYPES, action: `/fleet/units/${existing.id}/edit`,
+        unitTypes: UNIT_TYPES, categories: DOC_CATEGORIES, action: `/fleet/units/${existing.id}/edit`,
       });
     }
     throw err;
@@ -284,19 +326,7 @@ router.post('/units/:id/documents', requireAdmin, uploadDocs, requireCsrf, async
   const unit = await getUnit(req.params.id);
   if (!unit) return res.status(404).send('Unit not found.');
   const category = DOC_CATEGORIES.includes(req.body.category) ? req.body.category : 'Other';
-  const user = currentUser(req);
-  let saved = 0;
-  let rejected = 0;
-  for (const f of req.files || []) {
-    const sniffed = sniffDocMime(f.buffer);
-    if (!sniffed || f.size > 15 * 1024 * 1024) { rejected += 1; continue; }
-    await pool.query(
-      `INSERT INTO fleet_documents (unit_id, category, filename, mimetype, size_bytes, data, uploaded_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [unit.id, category, f.originalname.slice(0, 200), sniffed, f.size, f.buffer, user.id]
-    );
-    saved += 1;
-  }
+  const { saved, rejected } = await saveDocuments(unit.id, req.files, category, currentUser(req).id);
   const note = saved
     ? `${saved} document${saved === 1 ? '' : 's'} added to unit ${unit.unit_number}.${rejected ? ` ${rejected} file(s) were skipped (not a PDF or photo).` : ''}`
     : 'No documents were saved — the files must be PDFs or photos (JPG, PNG, WebP).';
