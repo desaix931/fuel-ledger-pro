@@ -1,0 +1,54 @@
+<h1>Fleet Equipment</h1>
+<p class="muted">Our own trailers, tankers, and trucks — search by unit number, VIN, or plate. Paperwork for each unit lives on its page.</p>
+<% if (notice) { %><p class="alert ok"><%= notice %></p><% } %>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+
+<% if (due.length) { %>
+<div class="card" style="border-color:#f0c6c2">
+  <h2 style="margin-top:0">⚠ Annual inspections due</h2>
+  <table class="grid">
+    <tr><th>Unit</th><th>Type</th><th>Due</th><th>Status</th></tr>
+    <% due.forEach((u) => { %>
+    <tr>
+      <td><a href="/fleet/units/<%= u.id %>"><%= u.unit_number %></a></td>
+      <td class="muted"><%= u.unit_type %></td>
+      <td><%= u.inspection_due_date %></td>
+      <td><% if (u.days_until_due < 0) { %><span class="badge off"><%= Math.abs(u.days_until_due) %> day<%= Math.abs(u.days_until_due) === 1 ? '' : 's' %> overdue</span><% } else if (u.days_until_due === 0) { %><span class="badge warn">due today</span><% } else { %><span class="badge warn">due in <%= u.days_until_due %> day<%= u.days_until_due === 1 ? '' : 's' %></span><% } %></td>
+    </tr>
+    <% }) %>
+  </table>
+</div>
+<% } %>
+
+<div class="card">
+  <form method="get" action="/fleet" class="filters">
+    <label>Search <input type="text" name="q" value="<%= q %>" placeholder="Unit #, VIN, plate, make…" maxlength="80"></label>
+    <span><button class="btn-primary" type="submit">Search</button>
+    <% if (q) { %><a class="btn" href="/fleet">Clear</a><% } %></span>
+  </form>
+  <% if (isAdmin) { %>
+  <p style="margin-bottom:0"><a class="btn-primary btn-sm" href="/fleet/new">+ Add unit</a>
+  <% if (showRetired) { %><a class="btn btn-sm" href="/fleet">Show active units</a><% } else { %><a class="btn btn-sm" href="/fleet?show=retired">Show retired units</a><% } %></p>
+  <% } %>
+</div>
+
+<div class="card">
+  <% if (!units.length) { %>
+    <p class="muted"><%= q ? `No units match “${q}”.` : (showRetired ? 'No retired units.' : 'No fleet units yet.') %></p>
+  <% } else { %>
+  <table class="grid">
+    <tr><th>Unit #</th><th>Type</th><th>Make / Year</th><th>Plate</th><th>Tire size</th><th>Annual inspection</th><th>Paperwork</th></tr>
+    <% units.forEach((u) => { %>
+    <tr>
+      <td><a href="/fleet/units/<%= u.id %>"><strong><%= u.unit_number %></strong></a><% if (!u.active) { %> <span class="badge off">retired</span><% } %></td>
+      <td class="muted"><%= u.unit_type %></td>
+      <td class="muted"><%= [u.make, u.model_year].filter(Boolean).join(' ') || '—' %></td>
+      <td class="muted"><%= u.plate || '—' %></td>
+      <td class="muted"><%= u.tire_size || '—' %></td>
+      <td><% if (!u.inspection_due_date) { %><span class="muted">not set</span><% } else if (u.days_until_due < 0) { %><span class="badge off">overdue · <%= u.inspection_due_date %></span><% } else if (u.days_until_due <= 30) { %><span class="badge warn">due <%= u.inspection_due_date %></span><% } else { %><%= u.inspection_due_date %><% } %></td>
+      <td class="muted"><%= u.doc_count %> file<%= u.doc_count === 1 ? '' : 's' %></td>
+    </tr>
+    <% }) %>
+  </table>
+  <% } %>
+</div>

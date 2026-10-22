@@ -218,3 +218,48 @@ CREATE TABLE IF NOT EXISTS hidden_suggestions (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (kind, value)
 );
+
+-- Fleet units: the company's OWN trailers / tankers / trucks, tracked by unit
+-- number (distinct from `equipment`, which is customer-site equipment filled
+-- on deliveries). Each unit carries its specs (tire size etc.), its annual
+-- inspection dates, and a folder of paperwork documents.
+CREATE TABLE IF NOT EXISTS fleet_units (
+  id                   SERIAL PRIMARY KEY,
+  unit_number          TEXT UNIQUE NOT NULL,
+  unit_type            TEXT NOT NULL DEFAULT 'Trailer',
+  description          TEXT,
+  make                 TEXT,
+  model_year           INTEGER,
+  vin                  TEXT,
+  plate                TEXT,
+  tire_size            TEXT,
+  tire_brand           TEXT,
+  axles                INTEGER,
+  capacity_gallons     NUMERIC(10,1),
+  last_inspection_date DATE,
+  inspection_due_date  DATE,
+  notes                TEXT,
+  active               BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Paperwork for a fleet unit (registration, insurance card, annual inspection
+-- report, title, ...). Same storage pattern as fill_documents: bytea in
+-- Postgres, because Render's container disk is ephemeral. Drivers can view;
+-- only admins upload or delete. Deleted automatically when the unit is deleted.
+CREATE TABLE IF NOT EXISTS fleet_documents (
+  id          SERIAL PRIMARY KEY,
+  unit_id     INTEGER NOT NULL REFERENCES fleet_units(id) ON DELETE CASCADE,
+  category    TEXT NOT NULL DEFAULT 'Other',
+  filename    TEXT NOT NULL,
+  mimetype    TEXT NOT NULL,
+  size_bytes  INTEGER NOT NULL,
+  data        BYTEA NOT NULL,
+  uploaded_by INTEGER REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fleet_docs_unit ON fleet_documents (unit_id);
+-- No index on fleet_units.inspection_due_date: the table holds dozens of
+-- units, so the due-soon scan is trivial without one.

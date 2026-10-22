@@ -63,6 +63,11 @@ table.grid th { color: var(--muted); font-weight: 600; font-size: .8rem; text-tr
 .badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .8rem;
   background: #eef3f7; border: 1px solid var(--line); }
 .badge.off { background: #fdecea; color: var(--err); }
+.badge.warn { background: #fdf3e0; color: #8a5a00; border-color: #ecd9a8; }
+.tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin: .8rem 0 1rem; }
+.tabs a { padding: .45rem .85rem; border: 1px solid var(--line); border-radius: 999px;
+  text-decoration: none; color: var(--brand-d); background: #eef3f7; font-size: .95rem; }
+.tabs a.active { background: var(--brand); border-color: var(--brand-d); color: #fff; font-weight: 700; }
 pre.ledger { background: #0f1c2b; color: #d7e6f5; padding: 1rem; border-radius: 8px;
   overflow-x: auto; font-size: .82rem; line-height: 1.5; }
 .rowbtns { display: flex; gap: .4rem; flex-wrap: wrap; }

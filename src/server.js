@@ -79,6 +79,7 @@ app.use('/driver', require('./routes/driver'));
 app.use('/admin', require('./routes/admin'));
 app.use('/admin/email', require('./routes/email'));
 app.use('/admin/ledger', require('./routes/ledger'));
+app.use('/fleet', require('./routes/fleet'));
 
 app.get('/', (req, res) => {
   if (!res.locals.user) return res.redirect('/login');

@@ -25,6 +25,29 @@ validated server-side (JPEG/PNG/WebP magic bytes, 8 MB max each). The office
 sees a "BOL ×n" badge in the entry log and on ledgers, and can view/download
 the photos from the fill's detail page (admin-only URLs).
 
+## Fleet Equipment (`/fleet`)
+
+A searchable database of the company's own trailers / tankers / trucks,
+looked up by unit number (search also matches VIN, plate, make, and
+description). Each unit page has tabs:
+
+- **Overview** — description, make/year, VIN, plate, status, notes.
+- **Specs** — tire size and brand, axles, capacity (gallons).
+- **Paperwork** — the unit's document folder (registration, insurance,
+  annual inspection reports, title, lease, maintenance). Files are PDFs or
+  photos, stored as bytea in Postgres like BOL photos and validated by
+  magic bytes (15 MB max each, 5 per upload).
+- **Inspection** — last annual inspection date and next due date. Entering a
+  last-inspection date auto-sets the due date one year out; "Record a
+  completed inspection" rolls it forward another year.
+
+Access: every logged-in user (drivers included) can search units and view or
+download paperwork. Only admins can add or edit units, upload or delete
+paperwork, record inspections, and retire/restore units (retiring hides the
+unit and its paperwork from drivers but keeps the files). The fleet list
+shows an **Annual inspections due** reminder panel — overdue units in red,
+units due within 30 days in amber — and due badges on each unit row.
+
 ## Run locally
 
 Prerequisites: Node 20+ and PostgreSQL 14+.

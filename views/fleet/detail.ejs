@@ -1,0 +1,107 @@
+<h1>Unit <%= unit.unit_number %> <span class="muted" style="font-size:1rem"><%= unit.unit_type %></span>
+<% if (!unit.active) { %> <span class="badge off">retired</span><% } %></h1>
+<% if (notice) { %><p class="alert ok"><%= notice %></p><% } %>
+<% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<% if (unit.inspection_due_date && unit.days_until_due < 0) { %><p class="alert err">⚠ Annual inspection is <strong><%= Math.abs(unit.days_until_due) %> day<%= Math.abs(unit.days_until_due) === 1 ? '' : 's' %> overdue</strong> (was due <%= unit.inspection_due_date %>).</p><% } else if (unit.inspection_due_date && unit.days_until_due <= 30) { %><p class="alert info">Annual inspection due <%= unit.inspection_due_date %> — <%= unit.days_until_due === 0 ? 'today' : `in ${unit.days_until_due} day${unit.days_until_due === 1 ? '' : 's'}` %>.</p><% } %>
+
+<nav class="tabs">
+  <a href="/fleet/units/<%= unit.id %>?tab=overview" class="<%= tab === 'overview' ? 'active' : '' %>">Overview</a>
+  <a href="/fleet/units/<%= unit.id %>?tab=specs" class="<%= tab === 'specs' ? 'active' : '' %>">Specs</a>
+  <a href="/fleet/units/<%= unit.id %>?tab=paperwork" class="<%= tab === 'paperwork' ? 'active' : '' %>">Paperwork (<%= docs.length %>)</a>
+  <a href="/fleet/units/<%= unit.id %>?tab=inspection" class="<%= tab === 'inspection' ? 'active' : '' %>">Inspection</a>
+</nav>
+
+<% if (tab === 'overview') { %>
+<div class="card">
+  <table class="grid">
+    <tr><th style="width:35%">Description</th><td><%= unit.description || '—' %></td></tr>
+    <tr><th>Make / Year</th><td><%= [unit.make, unit.model_year].filter(Boolean).join(' · ') || '—' %></td></tr>
+    <tr><th>VIN</th><td><%= unit.vin || '—' %></td></tr>
+    <tr><th>Plate</th><td><%= unit.plate || '—' %></td></tr>
+    <tr><th>Status</th><td><%= unit.active ? 'In service' : 'Retired' %></td></tr>
+    <% if (unit.notes) { %><tr><th>Notes</th><td><%= unit.notes %></td></tr><% } %>
+  </table>
+  <% if (isAdmin) { %>
+  <p class="rowbtns" style="margin-bottom:0">
+    <a class="btn-primary btn-sm" href="/fleet/units/<%= unit.id %>/edit">Edit unit</a>
+    <% if (unit.active) { %>
+    <form method="post" action="/fleet/units/<%= unit.id %>/retire" class="inline" onsubmit="return confirm('Retire unit <%= unit.unit_number %>? Drivers will no longer see it; paperwork is kept.')">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-sm btn-danger" type="submit">Retire unit</button></form>
+    <% } else { %>
+    <form method="post" action="/fleet/units/<%= unit.id %>/restore" class="inline">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-sm" type="submit">Restore to service</button></form>
+    <% } %>
+  </p>
+  <% } %>
+</div>
+<% } %>
+
+<% if (tab === 'specs') { %>
+<div class="card">
+  <table class="grid">
+    <tr><th style="width:35%">Tire size</th><td><%= unit.tire_size || '—' %></td></tr>
+    <tr><th>Tire brand</th><td><%= unit.tire_brand || '—' %></td></tr>
+    <tr><th>Axles</th><td><%= unit.axles || '—' %></td></tr>
+    <tr><th>Capacity (gallons)</th><td><%= unit.capacity_gallons || '—' %></td></tr>
+    <tr><th>Make / Year</th><td><%= [unit.make, unit.model_year].filter(Boolean).join(' · ') || '—' %></td></tr>
+    <tr><th>VIN</th><td><%= unit.vin || '—' %></td></tr>
+  </table>
+  <% if (isAdmin) { %><p style="margin-bottom:0"><a class="btn btn-sm" href="/fleet/units/<%= unit.id %>/edit">Edit specs</a></p><% } %>
+</div>
+<% } %>
+
+<% if (tab === 'paperwork') { %>
+<div class="card">
+  <% if (!docs.length) { %>
+    <p class="muted">No paperwork on file for this unit yet.<%= isAdmin ? ' Add the registration, insurance card, or inspection report below.' : '' %></p>
+  <% } else { %>
+  <table class="grid">
+    <tr><th>Category</th><th>File</th><th>Added</th><th></th></tr>
+    <% docs.forEach((d) => { %>
+    <tr>
+      <td><span class="badge"><%= d.category %></span></td>
+      <td><a href="/fleet/units/<%= unit.id %>/documents/<%= d.id %>" target="_blank" rel="noopener"><%= d.filename %></a>
+        <span class="muted">(<%= Math.max(1, Math.round(d.size_bytes / 1024)) %> KB)</span></td>
+      <td class="muted"><%= fmtDate(d.created_at) %><%= d.uploader ? ' · ' + d.uploader : '' %></td>
+      <td><% if (isAdmin) { %><form method="post" action="/fleet/units/<%= unit.id %>/documents/<%= d.id %>/delete" class="inline" onsubmit="return confirm('Delete <%= d.filename %>? This cannot be undone.')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-sm btn-danger" type="submit">Delete</button></form><% } %></td>
+    </tr>
+    <% }) %>
+  </table>
+  <% } %>
+</div>
+<% if (isAdmin) { %>
+<div class="card">
+  <h2 style="margin-top:0">Add paperwork</h2>
+  <form method="post" action="/fleet/units/<%= unit.id %>/documents" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Category <select name="category">
+        <% categories.forEach((c) => { %><option value="<%= c %>"><%= c %></option><% }) %></select></label>
+      <label>Files (PDF or photo, up to 5, 15 MB each) <input type="file" name="documents" accept="application/pdf,image/jpeg,image/png,image/webp" multiple required></label>
+    </div>
+    <p style="margin-bottom:0"><button class="btn-primary" type="submit">Upload</button></p>
+  </form>
+</div>
+<% } %>
+<% } %>
+
+<% if (tab === 'inspection') { %>
+<div class="card">
+  <table class="grid">
+    <tr><th style="width:35%">Last annual inspection</th><td><%= unit.last_inspection_date || '—' %></td></tr>
+    <tr><th>Next annual due</th><td><% if (!unit.inspection_due_date) { %>—<% } else if (unit.days_until_due < 0) { %><span class="badge off"><%= unit.inspection_due_date %> · <%= Math.abs(unit.days_until_due) %>d overdue</span><% } else if (unit.days_until_due <= 30) { %><span class="badge warn"><%= unit.inspection_due_date %> · in <%= unit.days_until_due %>d</span><% } else { %><%= unit.inspection_due_date %><% } %></td></tr>
+  </table>
+  <p class="muted">Every unit gets a reminder here and on the Fleet page starting 30 days before its annual is due.</p>
+  <% if (isAdmin) { %>
+  <h3>Record a completed inspection</h3>
+  <form method="post" action="/fleet/units/<%= unit.id %>/inspection" class="filters">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Inspection date <input type="date" name="inspection_date" value="<%= todayStr() %>" required></label>
+    <span><button class="btn-primary" type="submit">Save — next due in 1 year</button></span>
+  </form>
+  <% } %>
+</div>
+<% } %>
+
+<p><a href="/fleet">← Back to Fleet Equipment</a></p>
