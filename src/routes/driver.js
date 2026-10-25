@@ -77,7 +77,7 @@ router.get('/fills', async (req, res) => {
      ORDER BY f.filled_at DESC`,
     [res.locals.user.id]
   );
-  res.render('driver/fills', { fills: rows });
+  res.render('driver/fills', { fills: rows, saved: req.query.saved || '' });
 });
 
 // --- New fill form ---

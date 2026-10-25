@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 
 const pool = require('../db');
-const { requireLogin, requireCsrf } = require('../middleware');
+const { requireLogin, requireCsrf, currentUser } = require('../middleware');
 const { isEmail, passwordError } = require('../lib');
 
 const router = express.Router();
@@ -17,15 +17,27 @@ const loginLimiter = rateLimit({
   message: 'Too many login attempts. Please wait a few minutes and try again.',
 });
 
+// Lightweight session probe for the fill form's session guard: the form
+// checks this before posting, so a fill entered under a dead session is
+// held on the phone with a warning instead of being posted into a login
+// redirect that discards it. Returns the session's current CSRF token so
+// the form can refresh its hidden token if it ever drifts.
+router.get('/session-status', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const u = currentUser(req);
+  if (!u) return res.status(401).json({ loggedIn: false });
+  res.json({ loggedIn: true, csrf: req.session.csrf || null });
+});
+
 router.get('/login', (req, res) => {
   if (res.locals.user) return res.redirect('/');
-  res.render('login', { error: null, next: req.query.next || '' });
+  res.render('login', { error: null, next: req.query.next || '', expired: req.query.expired ? '1' : '' });
 });
 
 router.post('/login', loginLimiter, requireCsrf, async (req, res) => {
   const email = String(req.body.email || '').toLowerCase().trim();
   const password = String(req.body.password || '');
-  const fail = (msg) => res.status(401).render('login', { error: msg, next: req.body.next || '' });
+  const fail = (msg) => res.status(401).render('login', { error: msg, next: req.body.next || '', expired: req.body.expired || '' });
 
   if (!isEmail(email) || !password) return fail('Enter your email and password.');
 

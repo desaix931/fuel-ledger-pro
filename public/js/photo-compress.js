@@ -45,6 +45,10 @@
     });
   }
 
+  // Also exposed singly: the fill-form session guard compresses BOL photos
+  // the same way before stashing them in its on-phone draft.
+  window.compressPhotoFile = processFile;
+
   window.compressPhotosOnSubmit = function (formId) {
     var form = document.getElementById(formId);
     if (!form) return;

@@ -36,3 +36,25 @@
   </table>
   </div>
 </div>
+<script>
+// A fill that reached this page was saved — clear the fill form's on-phone
+// draft so it isn't restored later as if still unsent. Only runs when the
+// form's session guard flagged a submit in this tab.
+(function () {
+  var flagged = false;
+  try {
+    flagged = sessionStorage.getItem('flpSubmitted') === '1';
+    if (flagged) sessionStorage.removeItem('flpSubmitted');
+  } catch (e) { /* ignore */ }
+  if (!flagged) return;
+  try { localStorage.removeItem('flpFillDraft'); } catch (e) { /* ignore */ }
+  if (!('indexedDB' in window)) return;
+  var rq = indexedDB.open('fuel-ledger', 1);
+  rq.onupgradeneeded = function () {
+    if (!rq.result.objectStoreNames.contains('fillDrafts')) rq.result.createObjectStore('fillDrafts');
+  };
+  rq.onsuccess = function () {
+    try { rq.result.transaction('fillDrafts', 'readwrite').objectStore('fillDrafts').delete('new-fill'); } catch (e) { /* ignore */ }
+  };
+})();
+</script>

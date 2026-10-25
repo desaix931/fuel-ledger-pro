@@ -2,6 +2,27 @@
 <h1><%= editing ? 'Edit fill' : 'Log a fill' %></h1>
 <% if (errors && errors.length) { %><div class="alert err"><% errors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
 
+<% if (!editing) { %>
+<div id="session-expired-banner" class="alert err" style="display:none">
+  <strong>Your login expired &mdash; this fill has NOT been sent yet.</strong><br>
+  Everything you entered, including your photos and notes, is saved on this phone.
+  <div style="margin-top:.6rem">
+    <a id="expired-signin" class="btn-primary" href="/login?next=%2Fdriver%2Ffills%2Fnew&amp;expired=1" style="display:inline-block;text-decoration:none">Sign back in</a>
+  </div>
+  <div style="margin-top:.4rem">After you sign in you&rsquo;ll come right back to this fill &mdash; check it and tap Save fill.</div>
+</div>
+<div id="offline-banner" class="alert err" style="display:none">
+  <strong>Can&rsquo;t reach the server right now &mdash; this fill has NOT been sent yet.</strong><br>
+  Everything you entered is saved on this phone. Check your connection, then tap Save fill again.
+</div>
+<div id="restored-banner" class="alert ok" style="display:none">
+  <span id="restored-text"></span>
+  <div style="margin-top:.6rem">
+    <button type="button" class="btn btn-sm" id="discard-draft">Discard saved fill</button>
+  </div>
+</div>
+<% } %>
+
 <form method="post" action="<%= formAction %>" id="fillform" enctype="multipart/form-data">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
   <% if (editing) { %>
@@ -115,6 +136,7 @@
     <% } %>
     <label>Add BOL photo(s)
       <input type="file" name="bol_photos" accept="image/*" multiple></label>
+    <div id="restoredphotos" class="muted" style="display:none;font-size:.85rem"></div>
   </div>
 
   <button class="btn-primary btn-block" type="submit" style="font-size:1.2rem;padding:1rem"><%= editing ? 'Save changes' : 'Save fill' %></button>
@@ -215,3 +237,7 @@
   })();
 })();
 </script>
+<% if (!editing) { %>
+<script>window.__FLP_HAS_ERRORS__ = <%= (errors && errors.length) ? 'true' : 'false' %>;</script>
+<script src="/js/fill-guard.js"></script>
+<% } %>
