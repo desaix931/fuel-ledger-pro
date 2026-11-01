@@ -20,6 +20,23 @@
 </div>
 <% } %>
 
+<% if (maintDue && maintDue.length) { %>
+<div class="card" style="border-color:#f0c6c2">
+  <h2 style="margin-top:0">🔧 Maintenance due</h2>
+  <table class="grid">
+    <tr><th>Unit</th><th>Service</th><th>Due</th><th>Status</th></tr>
+    <% maintDue.forEach((m) => { %>
+    <tr>
+      <td><a href="/fleet/units/<%= m.unit_id %>?tab=maintenance"><%= m.unit_number %></a></td>
+      <td><%= m.service_type %></td>
+      <td class="muted"><%= [m.nextDueDate, m.nextDueMiles != null ? Number(m.nextDueMiles).toLocaleString('en-US') + ' mi' : null, m.nextDueHours != null ? Number(m.nextDueHours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+      <td><% if (m.state === 'overdue') { %><span class="badge off">overdue<% if (m.daysLeft != null && m.daysLeft < 0) { %> · <%= Math.abs(m.daysLeft) %>d<% } else if (m.milesLeft != null && m.milesLeft < 0) { %> · <%= Math.abs(m.milesLeft).toLocaleString('en-US') %> mi<% } else if (m.hoursLeft != null && m.hoursLeft < 0) { %> · <%= Math.abs(m.hoursLeft) %> hrs<% } %></span><% } else { %><span class="badge warn">due soon<% if (m.daysLeft != null && m.daysLeft >= 0) { %> · <%= m.daysLeft %>d<% } else if (m.milesLeft != null) { %> · <%= m.milesLeft.toLocaleString('en-US') %> mi left<% } else if (m.hoursLeft != null) { %> · <%= m.hoursLeft %> hrs left<% } %></span><% } %></td>
+    </tr>
+    <% }) %>
+  </table>
+</div>
+<% } %>
+
 <div class="card">
   <form method="get" action="/fleet" class="filters">
     <label>Search <input type="text" name="q" value="<%= q %>" placeholder="Unit #, VIN, plate, make…" maxlength="80"></label>
@@ -37,7 +54,7 @@
     <p class="muted"><%= q ? `No units match “${q}”.` : (showRetired ? 'No retired units.' : 'No fleet units yet.') %></p>
   <% } else { %>
   <table class="grid">
-    <tr><th>Unit #</th><th>Type</th><th>Make / Year</th><th>Plate</th><th>Tire size</th><th>Annual inspection</th><th>Paperwork</th></tr>
+    <tr><th>Unit #</th><th>Type</th><th>Make / Year</th><th>Plate</th><th>Tire size</th><th>Annual inspection</th><th>Maintenance</th><th>Paperwork</th></tr>
     <% units.forEach((u) => { %>
     <tr>
       <td><a href="/fleet/units/<%= u.id %>"><strong><%= u.unit_number %></strong></a><% if (!u.active) { %> <span class="badge off">retired</span><% } %></td>
@@ -46,6 +63,7 @@
       <td class="muted"><%= u.plate || '—' %></td>
       <td class="muted"><%= u.tire_size || '—' %></td>
       <td><% if (!u.inspection_due_date) { %><span class="muted">not set</span><% } else if (u.days_until_due < 0) { %><span class="badge off">overdue · <%= u.inspection_due_date %></span><% } else if (u.days_until_due <= 30) { %><span class="badge warn">due <%= u.inspection_due_date %></span><% } else { %><%= u.inspection_due_date %><% } %></td>
+      <td><% if (u.maint_state === 'overdue') { %><a href="/fleet/units/<%= u.id %>?tab=maintenance"><span class="badge off">overdue</span></a><% } else if (u.maint_state === 'due') { %><a href="/fleet/units/<%= u.id %>?tab=maintenance"><span class="badge warn">due soon</span></a><% } else if (u.maint_state === 'ok') { %>ok<% } else { %><span class="muted">—</span><% } %></td>
       <td class="muted"><%= u.doc_count %> file<%= u.doc_count === 1 ? '' : 's' %></td>
     </tr>
     <% }) %>

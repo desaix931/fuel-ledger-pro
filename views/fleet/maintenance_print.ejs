@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %></title>
+<style>
+  body { font-family: Georgia, 'Times New Roman', serif; color: #111; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+  h1 { font-size: 1.35rem; margin-bottom: .1rem; }
+  h2 { font-size: 1.05rem; margin: 1.4rem 0 .4rem; border-bottom: 2px solid #333; padding-bottom: .2rem; }
+  .sub { color: #444; margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { border: 1px solid #999; padding: .3rem .45rem; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .idgrid th { width: 22%; }
+  .foot { margin-top: 1.6rem; font-size: .8rem; color: #444; }
+  .noprint { margin-bottom: 1rem; }
+  @media print { .noprint { display: none; } body { margin: 0; } }
+</style>
+</head>
+<body>
+<p class="noprint"><button onclick="window.print()">🖨 Print / save as PDF</button> &nbsp;<a href="/fleet/units/<%= unit.id %>?tab=maintenance">← Back to unit <%= unit.unit_number %></a></p>
+
+<h1>Desaix Transport LLC — Vehicle Maintenance File</h1>
+<p class="sub">Maintenance record per 49 CFR 396.3 · Printed <%= new Date().toLocaleDateString('en-US') %></p>
+
+<h2>Unit identification</h2>
+<table class="idgrid">
+  <tr><th>Unit number</th><td><%= unit.unit_number %></td><th>Type</th><td><%= unit.unit_type %></td></tr>
+  <tr><th>Make / Year</th><td><%= [unit.make, unit.model_year].filter(Boolean).join(' · ') || '—' %></td><th>Description</th><td><%= unit.description || '—' %></td></tr>
+  <tr><th>VIN</th><td><%= unit.vin || '—' %></td><th>Plate</th><td><%= unit.plate || '—' %></td></tr>
+  <tr><th>Tire size / brand</th><td><%= [unit.tire_size, unit.tire_brand].filter(Boolean).join(' · ') || '—' %></td><th>Axles / Capacity</th><td><%= [unit.axles ? unit.axles + ' axles' : null, unit.capacity_gallons ? Number(unit.capacity_gallons).toLocaleString('en-US') + ' gal' : null].filter(Boolean).join(' · ') || '—' %></td></tr>
+  <tr><th>Current odometer</th><td><%= unit.current_miles != null ? Number(unit.current_miles).toLocaleString('en-US') + ' mi' : '—' %></td><th>Current engine hours</th><td><%= unit.current_hours != null ? Number(unit.current_hours).toLocaleString('en-US') + ' hrs' : '—' %></td></tr>
+  <tr><th>Last annual inspection</th><td><%= unit.last_inspection_date || '—' %></td><th>Next annual due</th><td><%= unit.inspection_due_date || '—' %></td></tr>
+  <tr><th>Status</th><td colspan="3"><%= unit.active ? 'In service' : 'Retired' %><% if (unit.reading_date) { %> · Readings as of <%= unit.reading_date %><% } %></td></tr>
+</table>
+
+<h2>Schedule of maintenance due</h2>
+<% if (!schedules.length) { %>
+<p>No service intervals are tracked for this unit.</p>
+<% } else { %>
+<table>
+  <tr><th>Service</th><th>Interval</th><th>Last done</th><th>Next due</th><th>Status</th></tr>
+  <% schedules.forEach((s) => { const st = s.status; %>
+  <tr>
+    <td><%= s.service_type %></td>
+    <td><%= [s.interval_days ? 'every ' + s.interval_days + ' days' : null, s.interval_miles ? 'every ' + Number(s.interval_miles).toLocaleString('en-US') + ' mi' : null, s.interval_hours ? 'every ' + Number(s.interval_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(', ') || '—' %></td>
+    <td><%= [s.last_done_date, s.last_done_miles != null ? Number(s.last_done_miles).toLocaleString('en-US') + ' mi' : null, s.last_done_hours != null ? Number(s.last_done_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+    <td><%= [st.nextDueDate, st.nextDueMiles != null ? Number(st.nextDueMiles).toLocaleString('en-US') + ' mi' : null, st.nextDueHours != null ? Number(st.nextDueHours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+    <td><%= st.state === 'unknown' ? 'baseline not set' : st.state %></td>
+  </tr>
+  <% }) %>
+</table>
+<% } %>
+
+<h2>Record of inspections, repairs, and maintenance performed</h2>
+<% if (!records.length) { %>
+<p>No service has been logged for this unit.</p>
+<% } else { %>
+<table>
+  <tr><th>Date</th><th>Service</th><th>Nature of work</th><th>Odometer / Hours</th><th>Performed by</th><th>Cost</th></tr>
+  <% records.forEach((r) => { %>
+  <tr>
+    <td style="white-space:nowrap"><%= r.service_date %></td>
+    <td><%= r.service_type %></td>
+    <td><%= r.description || '—' %></td>
+    <td style="white-space:nowrap"><%= [r.odometer_miles != null ? Number(r.odometer_miles).toLocaleString('en-US') + ' mi' : null, r.engine_hours != null ? Number(r.engine_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+    <td><%= r.performed_by || '—' %></td>
+    <td><%= r.cost != null ? '$' + Number(r.cost).toFixed(2) : '—' %></td>
+  </tr>
+  <% }) %>
+</table>
+<% } %>
+
+<p class="foot">Retention (49 CFR 396.3(d)): maintenance records are kept for one year while the vehicle is in service, and for six months after it leaves the carrier's control. Annual inspection reports are kept 14 months (49 CFR 396.21). This file is generated from Desaix Transport's Fuel Ledger records.</p>
+</body>
+</html>

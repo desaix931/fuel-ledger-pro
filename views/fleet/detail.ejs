@@ -2,6 +2,7 @@
 <% if (!unit.active) { %> <span class="badge off">retired</span><% } %></h1>
 <% if (notice) { %><p class="alert ok"><%= notice %></p><% } %>
 <% if (error) { %><p class="alert err"><%= error %></p><% } %>
+<% if (overdueCount) { %><p class="alert err">⚠ <strong><%= overdueCount %> maintenance item<%= overdueCount === 1 ? ' is' : 's are' %> overdue</strong> on this unit — see the <a href="/fleet/units/<%= unit.id %>?tab=maintenance">Maintenance tab</a>.</p><% } %>
 <% if (unit.inspection_due_date && unit.days_until_due < 0) { %><p class="alert err">⚠ Annual inspection is <strong><%= Math.abs(unit.days_until_due) %> day<%= Math.abs(unit.days_until_due) === 1 ? '' : 's' %> overdue</strong> (was due <%= unit.inspection_due_date %>).</p><% } else if (unit.inspection_due_date && unit.days_until_due <= 30) { %><p class="alert info">Annual inspection due <%= unit.inspection_due_date %> — <%= unit.days_until_due === 0 ? 'today' : `in ${unit.days_until_due} day${unit.days_until_due === 1 ? '' : 's'}` %>.</p><% } %>
 
 <nav class="tabs">
@@ -9,6 +10,7 @@
   <a href="/fleet/units/<%= unit.id %>?tab=specs" class="<%= tab === 'specs' ? 'active' : '' %>">Specs</a>
   <a href="/fleet/units/<%= unit.id %>?tab=paperwork" class="<%= tab === 'paperwork' ? 'active' : '' %>">Paperwork (<%= docs.length %>)</a>
   <a href="/fleet/units/<%= unit.id %>?tab=inspection" class="<%= tab === 'inspection' ? 'active' : '' %>">Inspection</a>
+  <a href="/fleet/units/<%= unit.id %>?tab=maintenance" class="<%= tab === 'maintenance' ? 'active' : '' %>">Maintenance<% if (overdueCount) { %> (<%= overdueCount %> overdue)<% } %></a>
 </nav>
 
 <% if (tab === 'overview') { %>
@@ -105,8 +107,153 @@
 </div>
 <% } %>
 
+<% if (tab === 'maintenance') { %>
+<div class="card">
+  <h2 style="margin-top:0">Current readings</h2>
+  <table class="grid">
+    <tr><th style="width:35%">Odometer</th><td><%= unit.current_miles != null ? Number(unit.current_miles).toLocaleString('en-US') + ' mi' : '—' %></td></tr>
+    <tr><th>Engine hours</th><td><%= unit.current_hours != null ? Number(unit.current_hours).toLocaleString('en-US') + ' hrs' : '—' %></td></tr>
+    <tr><th>Readings as of</th><td><%= unit.reading_date || '—' %></td></tr>
+  </table>
+  <p class="muted">Mile and hour due-dates count from these readings — logging a service with its odometer/hours updates them automatically.</p>
+  <% if (isAdmin) { %>
+  <form method="post" action="/fleet/units/<%= unit.id %>/readings" class="filters">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Odometer (miles) <input type="number" name="current_miles" min="0" step="1" value="<%= unit.current_miles != null ? unit.current_miles : '' %>"></label>
+    <label>Engine hours <input type="number" name="current_hours" min="0" step="0.1" value="<%= unit.current_hours != null ? unit.current_hours : '' %>"></label>
+    <span><button class="btn-primary" type="submit">Update readings</button></span>
+  </form>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Service schedule — what's due</h2>
+  <% if (!schedules.length) { %>
+    <p class="muted">No service intervals tracked for this unit yet.<%= isAdmin ? ' Add the first one below — oil change, tire rotation, air filter, whatever this unit needs on a cycle.' : '' %></p>
+  <% } else { %>
+  <table class="grid">
+    <tr><th>Service</th><th>Every</th><th>Last done</th><th>Next due</th><th>Status</th><% if (isAdmin) { %><th></th><% } %></tr>
+    <% schedules.forEach((s) => { const st = s.status; %>
+    <tr>
+      <td><strong><%= s.service_type %></strong><% if (s.notes) { %> <span class="muted">· <%= s.notes %></span><% } %></td>
+      <td class="muted"><%= [s.interval_days ? s.interval_days + ' days' : null, s.interval_miles ? Number(s.interval_miles).toLocaleString('en-US') + ' mi' : null, s.interval_hours ? Number(s.interval_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+      <td class="muted"><%= [s.last_done_date, s.last_done_miles != null ? Number(s.last_done_miles).toLocaleString('en-US') + ' mi' : null, s.last_done_hours != null ? Number(s.last_done_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+      <td class="muted"><%= [st.nextDueDate, st.nextDueMiles != null ? Number(st.nextDueMiles).toLocaleString('en-US') + ' mi' : null, st.nextDueHours != null ? Number(st.nextDueHours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+      <td><% if (st.state === 'overdue') { %><span class="badge off">overdue<% if (st.daysLeft != null && st.daysLeft < 0) { %> · <%= Math.abs(st.daysLeft) %>d<% } else if (st.milesLeft != null && st.milesLeft < 0) { %> · <%= Math.abs(st.milesLeft).toLocaleString('en-US') %> mi<% } else if (st.hoursLeft != null && st.hoursLeft < 0) { %> · <%= Math.abs(st.hoursLeft) %> hrs<% } %></span><% } else if (st.state === 'due') { %><span class="badge warn">due soon<% if (st.daysLeft != null && st.daysLeft >= 0) { %> · <%= st.daysLeft %>d<% } else if (st.milesLeft != null) { %> · <%= st.milesLeft.toLocaleString('en-US') %> mi left<% } else if (st.hoursLeft != null) { %> · <%= st.hoursLeft %> hrs left<% } %></span><% } else if (st.state === 'ok') { %>ok<% } else { %><span class="muted">needs a last-done date<%= (s.interval_miles || s.interval_hours) ? ' / reading' : '' %></span><% } %></td>
+      <% if (isAdmin) { %><td style="white-space:nowrap"><button class="btn btn-sm" type="button" onclick="editSchedule(this)" data-type="<%= s.service_type %>" data-days="<%= s.interval_days || '' %>" data-miles="<%= s.interval_miles || '' %>" data-hours="<%= s.interval_hours || '' %>" data-ld="<%= s.last_done_date || '' %>" data-lm="<%= s.last_done_miles != null ? s.last_done_miles : '' %>" data-lh="<%= s.last_done_hours != null ? s.last_done_hours : '' %>" data-notes="<%= s.notes || '' %>">Edit</button>
+      <form method="post" action="/fleet/units/<%= unit.id %>/schedules/<%= s.id %>/delete" class="inline" onsubmit="return confirm('Stop tracking <%= s.service_type %> for this unit? Logged service history is kept.')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-sm btn-danger" type="submit">Remove</button></form></td><% } %>
+    </tr>
+    <% }) %>
+  </table>
+  <% } %>
+  <p style="margin-bottom:0"><a class="btn btn-sm" href="/fleet/units/<%= unit.id %>/maintenance/print" target="_blank" rel="noopener">🖨 Print maintenance file (FMCSA record)</a></p>
+</div>
+
+<% if (isAdmin) { %>
+<div class="card">
+  <h2 style="margin-top:0" id="schedFormTitle">Add / update a schedule</h2>
+  <form method="post" action="/fleet/units/<%= unit.id %>/schedules" id="schedForm">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Service <select name="service_type" id="sfType">
+        <% serviceTypes.forEach((t) => { %><option value="<%= t %>"><%= t %></option><% }) %></select></label>
+      <label>…or a custom kind <input type="text" name="service_type_custom" id="sfCustom" maxlength="80" placeholder="e.g. Kingpin / fifth-wheel service"></label>
+    </div>
+    <div class="filters">
+      <label>Every (days) <input type="number" name="interval_days" id="sfDays" min="1" step="1" placeholder="e.g. 180"></label>
+      <label>Every (miles) <input type="number" name="interval_miles" id="sfMiles" min="1" step="1" placeholder="e.g. 15000"></label>
+      <label>Every (hours) <input type="number" name="interval_hours" id="sfHours" min="1" step="0.1" placeholder="e.g. 500"></label>
+    </div>
+    <div class="filters">
+      <label>Last done (date) <input type="date" name="last_done_date" id="sfLd"></label>
+      <label>Last done (odometer) <input type="number" name="last_done_miles" id="sfLm" min="0" step="1"></label>
+      <label>Last done (hours) <input type="number" name="last_done_hours" id="sfLh" min="0" step="0.1"></label>
+      <label>Notes <input type="text" name="notes" id="sfNotes" maxlength="200"></label>
+    </div>
+    <p class="muted" style="margin-bottom:.4rem">Fill in at least one “Every” and the matching “Last done” so the next due can be figured. Logging the service below updates “Last done” for you from then on.</p>
+    <p style="margin-bottom:0"><button class="btn-primary" type="submit">Save schedule</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Log service or a repair</h2>
+  <form method="post" action="/fleet/units/<%= unit.id %>/service">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="filters">
+      <label>Date done <input type="date" name="service_date" value="<%= todayStr() %>" required></label>
+      <label>Service <select name="service_type">
+        <% serviceTypes.forEach((t) => { %><option value="<%= t %>"><%= t %></option><% }) %></select></label>
+      <label>…or a custom kind <input type="text" name="service_type_custom" maxlength="80"></label>
+    </div>
+    <div class="filters">
+      <label style="flex:1">What was done <input type="text" name="description" maxlength="500" placeholder="e.g. Oil + filter, 15W-40, sampled; two steer tires rotated"></label>
+    </div>
+    <div class="filters">
+      <label>Odometer (miles) <input type="number" name="odometer_miles" min="0" step="1"></label>
+      <label>Engine hours <input type="number" name="engine_hours" min="0" step="0.1"></label>
+      <label>Done by <input type="text" name="performed_by" maxlength="120" placeholder="Shop or tech name"></label>
+      <label>Cost ($) <input type="number" name="cost" min="0" step="0.01"></label>
+    </div>
+    <p style="margin-bottom:0"><button class="btn-primary" type="submit">Log it</button></p>
+  </form>
+</div>
+<% } %>
+
+<div class="card">
+  <h2 style="margin-top:0">Service history</h2>
+  <% if (!records.length) { %>
+    <p class="muted">Nothing logged yet for this unit.</p>
+  <% } else { %>
+  <table class="grid">
+    <tr><th>Date</th><th>Service</th><th>What was done</th><th>At</th><th>Done by</th><th>Cost</th><th>Next was due</th><% if (isAdmin) { %><th></th><% } %></tr>
+    <% records.forEach((r) => { %>
+    <tr>
+      <td style="white-space:nowrap"><%= r.service_date %></td>
+      <td><span class="badge"><%= r.service_type %></span></td>
+      <td><%= r.description || '—' %><% if (r.recorder) { %> <span class="muted">· logged by <%= r.recorder %></span><% } %></td>
+      <td class="muted" style="white-space:nowrap"><%= [r.odometer_miles != null ? Number(r.odometer_miles).toLocaleString('en-US') + ' mi' : null, r.engine_hours != null ? Number(r.engine_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+      <td class="muted"><%= r.performed_by || '—' %></td>
+      <td class="muted"><%= r.cost != null ? '$' + Number(r.cost).toFixed(2) : '—' %></td>
+      <td class="muted"><%= [r.next_due_date, r.next_due_miles != null ? Number(r.next_due_miles).toLocaleString('en-US') + ' mi' : null, r.next_due_hours != null ? Number(r.next_due_hours).toLocaleString('en-US') + ' hrs' : null].filter(Boolean).join(' · ') || '—' %></td>
+      <% if (isAdmin) { %><td><form method="post" action="/fleet/units/<%= unit.id %>/service/<%= r.id %>/delete" class="inline" onsubmit="return confirm('Delete this service record? This cannot be undone.')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-sm btn-danger" type="submit">Delete</button></form></td><% } %>
+    </tr>
+    <% }) %>
+  </table>
+  <% if (records.length >= 100) { %><p class="muted">Showing the newest 100 — the print view has the full history.</p><% } %>
+  <% } %>
+</div>
+<% } %>
+
 <p><a href="/fleet">← Back to Fleet Equipment</a></p>
 <script>
+// Fill the schedule form from a row's Edit button so intervals / baselines
+// can be adjusted without retyping.
+function editSchedule(btn) {
+  var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
+  var type = btn.getAttribute('data-type');
+  var sel = document.getElementById('sfType');
+  var custom = document.getElementById('sfCustom');
+  var found = false;
+  if (sel) {
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === type) { sel.selectedIndex = i; found = true; break; }
+    }
+  }
+  if (custom) custom.value = found ? '' : type;
+  set('sfDays', btn.getAttribute('data-days'));
+  set('sfMiles', btn.getAttribute('data-miles'));
+  set('sfHours', btn.getAttribute('data-hours'));
+  set('sfLd', btn.getAttribute('data-ld'));
+  set('sfLm', btn.getAttribute('data-lm'));
+  set('sfLh', btn.getAttribute('data-lh'));
+  set('sfNotes', btn.getAttribute('data-notes'));
+  var title = document.getElementById('schedFormTitle');
+  if (title) title.textContent = 'Edit schedule — ' + type;
+  var form = document.getElementById('schedForm');
+  if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 // Share a paperwork document with the phone's share sheet (Messages, Mail,
 // AirDrop, ...). Sends the actual file when the browser supports file
 // sharing; falls back to sharing the link, then to just opening it.

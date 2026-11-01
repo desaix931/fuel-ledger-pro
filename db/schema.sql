@@ -263,3 +263,53 @@ CREATE TABLE IF NOT EXISTS fleet_documents (
 CREATE INDEX IF NOT EXISTS idx_fleet_docs_unit ON fleet_documents (unit_id);
 -- No index on fleet_units.inspection_due_date: the table holds dozens of
 -- units, so the due-soon scan is trivial without one.
+
+-- Maintenance tracking per fleet unit, built to the FMCSA recordkeeping rule
+-- (49 CFR 396.3): the file for each unit shows the unit's identification
+-- (unit #, make, year, VIN, tire size — on fleet_units), a schedule of
+-- maintenance by type and when it is due, and a record of every inspection,
+-- repair, and maintenance performed with its nature and date. Schedules track
+-- intervals in days and/or miles and/or engine hours; the unit's current
+-- odometer / hour readings live on fleet_units and are bumped by any service
+-- record that carries a newer reading. Retention is the office's job — the
+-- app never deletes service history on its own.
+ALTER TABLE fleet_units ADD COLUMN IF NOT EXISTS current_miles INTEGER;
+ALTER TABLE fleet_units ADD COLUMN IF NOT EXISTS current_hours NUMERIC(10,1);
+ALTER TABLE fleet_units ADD COLUMN IF NOT EXISTS reading_date DATE;
+
+CREATE TABLE IF NOT EXISTS fleet_maintenance_schedules (
+  id              SERIAL PRIMARY KEY,
+  unit_id         INTEGER NOT NULL REFERENCES fleet_units(id) ON DELETE CASCADE,
+  service_type    TEXT NOT NULL,
+  interval_days   INTEGER,
+  interval_miles  INTEGER,
+  interval_hours  NUMERIC(10,1),
+  last_done_date  DATE,
+  last_done_miles INTEGER,
+  last_done_hours NUMERIC(10,1),
+  notes           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (unit_id, service_type)
+);
+
+CREATE TABLE IF NOT EXISTS fleet_service_records (
+  id             SERIAL PRIMARY KEY,
+  unit_id        INTEGER NOT NULL REFERENCES fleet_units(id) ON DELETE CASCADE,
+  schedule_id    INTEGER REFERENCES fleet_maintenance_schedules(id) ON DELETE SET NULL,
+  service_date   DATE NOT NULL,
+  service_type   TEXT NOT NULL,
+  description    TEXT,
+  odometer_miles INTEGER,
+  engine_hours   NUMERIC(10,1),
+  performed_by   TEXT,
+  cost           NUMERIC(10,2),
+  next_due_date  DATE,
+  next_due_miles INTEGER,
+  next_due_hours NUMERIC(10,1),
+  recorded_by    INTEGER REFERENCES users(id),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fleet_svc_unit ON fleet_service_records (unit_id, service_date DESC);
+CREATE INDEX IF NOT EXISTS idx_fleet_sched_unit ON fleet_maintenance_schedules (unit_id);
