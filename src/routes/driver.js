@@ -175,8 +175,9 @@ router.get('/fills/:id/edit', async (req, res) => {
       fuel_type: FUEL_TYPES.includes(f.fuel_type) ? f.fuel_type : '__custom',
       fuel_type_custom: FUEL_TYPES.includes(f.fuel_type) ? '' : f.fuel_type,
       gallons: f.gallons, filled_at: toInputDateTime(f.filled_at), notes: f.notes || '',
+      bol_number: f.bol_number || '',
     },
-    editing: f, ...driverChrome(f.id, res.locals.user),
+    editing: f, ...driverChrome(f.id, res.locals.user), ...(await driverPickerLocals(res.locals.user)),
     bolDocs: docs.rows,
   });
 });
@@ -198,7 +199,7 @@ router.post('/fills/:id/edit', bolUploadFields, requireCsrf, async (req, res) =>
     const lookups = await formLookups();
     const docs = await pool.query(
       'SELECT id, filename, size_bytes FROM fill_documents WHERE fill_id = $1 ORDER BY id', [req.params.id]);
-    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: rows[0], ...driverChrome(req.params.id, res.locals.user), bolDocs: docs.rows });
+    return res.status(400).render('driver/fill_form', { lookups, errors: allErrors, form: req.body, editing: rows[0], ...driverChrome(req.params.id, res.locals.user), ...(await driverPickerLocals(res.locals.user)), bolDocs: docs.rows });
   }
   // Update the fill + append new BOL photos atomically.
   const client = await pool.connect();
