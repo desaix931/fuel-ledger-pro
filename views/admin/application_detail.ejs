@@ -43,7 +43,7 @@
   <% if (!docs.length) { %>
     <p class="muted">No documents attached.</p>
   <% } else { %>
-    <% const DOC_NAMES = { license_front: "Driver's license — front", license_back: "Driver's license — back", medical_card: "DOT medical certificate", other: "Additional document" }; %>
+    <% const DOC_NAMES = { license_front: "Driver's license — front", license_back: "Driver's license — back", medical_card: "DOT medical certificate", other: "Additional document", w4: "IRS Form W-4", nda: "Signed NDA" }; %>
     <div style="display:flex;flex-wrap:wrap;gap:1rem">
       <% docs.forEach((d) => { const url = '/admin/applications/' + a.id + '/documents/' + d.id; %>
         <figure style="margin:0;width:200px">

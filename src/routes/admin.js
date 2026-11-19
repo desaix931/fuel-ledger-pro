@@ -632,7 +632,32 @@ router.get('/applications', async (req, res) => {
             ja.years_experience, ja.status, ja.created_at,
             (SELECT COUNT(*) FROM application_documents d WHERE d.application_id = ja.id) AS doc_count
      FROM job_applications ja ORDER BY ja.created_at DESC LIMIT 500`);
-  res.render('admin/applications', { apps: rows, msg: req.query.msg || null });
+  // W-4 / NDA photos uploaded after the DOT package that did NOT match an
+  // application — kept with the typed name/email/DOB for manual reconciling.
+  const paperwork = await pool.query(
+    `SELECT id, full_name, email, dob, doc_type, filename, mimetype, size_bytes, created_at
+     FROM paperwork_uploads ORDER BY created_at DESC LIMIT 200`);
+  res.render('admin/applications', { apps: rows, paperwork: paperwork.rows, msg: req.query.msg || null });
+});
+
+// Serve an unmatched paperwork upload's bytes. Admin-only, same as the
+// application document route below — W-4s are sensitive PII.
+router.get('/applications/paperwork/:docId', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT filename, mimetype, size_bytes, data
+     FROM paperwork_uploads WHERE id = $1`,
+    [req.params.docId]
+  );
+  if (!rows.length) return res.status(404).send('Document not found.');
+  const d = rows[0];
+  res.set('Content-Type', d.mimetype);
+  res.set('Content-Length', String(d.size_bytes));
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.query.download === '1') {
+    const safe = String(d.filename).replace(/["\r\n]/g, '');
+    res.set('Content-Disposition', `attachment; filename="${safe}"`);
+  }
+  res.send(d.data);
 });
 
 router.get('/applications/:id', async (req, res) => {

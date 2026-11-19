@@ -143,7 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_applications_created ON job_applications (created
 CREATE TABLE IF NOT EXISTS application_documents (
   id             SERIAL PRIMARY KEY,
   application_id INTEGER NOT NULL REFERENCES job_applications(id) ON DELETE CASCADE,
-  doc_type       TEXT NOT NULL CHECK (doc_type IN ('license_front','license_back','medical_card','other')),
+  doc_type       TEXT NOT NULL CHECK (doc_type IN ('license_front','license_back','medical_card','other','w4','nda')),
   filename       TEXT NOT NULL,
   mimetype       TEXT NOT NULL,
   size_bytes     INTEGER NOT NULL,
@@ -152,6 +152,34 @@ CREATE TABLE IF NOT EXISTS application_documents (
 );
 
 CREATE INDEX IF NOT EXISTS idx_app_docs_application ON application_documents (application_id);
+
+-- Post-hire paperwork (IRS Form W-4 + signed company NDA) uploaded from the
+-- /hire/thanks "Next steps" form. Widen the doc_type CHECK on databases
+-- created before 'w4'/'nda' existed (idempotent: drop + re-add every boot).
+ALTER TABLE application_documents DROP CONSTRAINT IF EXISTS application_documents_doc_type_check;
+ALTER TABLE application_documents ADD CONSTRAINT application_documents_doc_type_check
+  CHECK (doc_type IN ('license_front','license_back','medical_card','other','w4','nda'));
+
+-- W-4 / NDA uploads that could NOT be matched to a job application (matched
+-- uploads go straight into application_documents instead). Stored with the
+-- name/email/DOB the driver typed so the office can reconcile them manually;
+-- surfaced on Admin → Applications. Same bytea pattern as the other
+-- document tables (Render's disk is ephemeral).
+CREATE TABLE IF NOT EXISTS paperwork_uploads (
+  id             SERIAL PRIMARY KEY,
+  full_name      TEXT NOT NULL,
+  email          TEXT NOT NULL,
+  dob            DATE,
+  doc_type       TEXT NOT NULL CHECK (doc_type IN ('w4','nda')),
+  filename       TEXT NOT NULL,
+  mimetype       TEXT NOT NULL,
+  size_bytes     INTEGER NOT NULL,
+  data           BYTEA NOT NULL,
+  source_ip      TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_paperwork_uploads_created ON paperwork_uploads (created_at);
 
 -- BOL (Bill of Lading) photos attached to fill entries. Same storage pattern
 -- as application_documents: bytea in Postgres (NOT on disk), because Render's

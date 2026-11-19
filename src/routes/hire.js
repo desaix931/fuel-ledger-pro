@@ -6,10 +6,12 @@
 // inquiries, and pre-employment drug test itself. Operational info, not legal advice.
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
 
 const pool = require('../db');
 const { isEmail } = require('../lib');
 const mailer = require('../lib/mailer');
+const { ndaFileExists } = require('./forms');
 
 const router = express.Router();
 
@@ -216,6 +218,95 @@ async function softMatch(v) {
   return { matched: null, match_status: 'unmatched' };
 }
 
+// ---------- post-package paperwork uploads (W-4 + signed NDA photos) ----------
+// Shown on /hire/thanks after the DOT package is submitted. Same storage
+// pattern as /apply: photos kept in memory, sniffed, stored as bytea.
+// Matched uploads land in application_documents (doc_type 'w4'/'nda') so
+// they show with the driver's other credentials in Admin → Applications;
+// unmatched ones are kept in paperwork_uploads with the typed identity.
+
+const paperworkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 8 }, // 8 MB per photo, max 8 photos
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) return cb(null, true);
+    cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname));
+  },
+});
+
+const PAPERWORK_FIELDS = [
+  { name: 'doc_w4', maxCount: 4 },
+  { name: 'doc_nda', maxCount: 4 },
+];
+
+const PAPERWORK_LABELS = { doc_w4: 'W-4', doc_nda: 'NDA' };
+
+// Defense in depth: the client can spoof mimetypes, so sniff the magic bytes too.
+function sniffImageMime(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+function renderThanks(res, status, extra) {
+  return res.status(status).render('hire/thanks', Object.assign({
+    ndaAvailable: ndaFileExists(),
+    paperworkDone: false,
+    paperworkErrors: [],
+    paperworkValues: { full_name: '', email: '', dob: '' },
+  }, extra || {}));
+}
+
+// Friendly error page for multer failures (too big, wrong type, too many files).
+function handlePaperworkUpload(req, res, next) {
+  paperworkUpload.fields(PAPERWORK_FIELDS)(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE'
+        ? 'One of your photos is larger than 8 MB. Please use a smaller photo and try again.'
+        : 'One of your uploads was not a valid photo (JPEG, PNG, or WebP), or you attached too many pages (max 4 per form). Please check your files and try again.';
+      const b = req.body || {};
+      return renderThanks(res, 400, {
+        paperworkErrors: [msg + ' (You will need to re-select your photos.)'],
+        paperworkValues: {
+          full_name: str(first(b.full_name), 120),
+          email: str(first(b.email), 160),
+          dob: str(first(b.dob), 10),
+        },
+      });
+    }
+    next();
+  });
+}
+
+// Returns { errors, docs } where docs is the sanitized list to save.
+function validatePaperworkDocs(files) {
+  const errors = [];
+  const docs = [];
+  for (const field of PAPERWORK_FIELDS) {
+    const list = (files && files[field.name]) || [];
+    for (const f of list) {
+      const sniffed = sniffImageMime(f.buffer);
+      if (!sniffed || f.size > 8 * 1024 * 1024) {
+        errors.push(`${PAPERWORK_LABELS[field.name]} photos must be photos (JPEG, PNG, or WebP), 8 MB or smaller.`);
+        continue;
+      }
+      docs.push({
+        doc_type: field.name === 'doc_w4' ? 'w4' : 'nda',
+        filename: String(f.originalname || 'photo').replace(/[^\w.\- ]+/g, '_').slice(0, 120) || 'photo.jpg',
+        mimetype: sniffed,
+        size: f.size,
+        buffer: f.buffer,
+      });
+    }
+  }
+  if (!docs.length && !errors.length) {
+    errors.push('Attach at least one photo — your completed W-4 or your signed NDA (up to 4 pages each).');
+  }
+  return { errors, docs };
+}
+
 // ---------- office notification ----------
 
 async function notifyOffice(pkg) {
@@ -269,7 +360,65 @@ router.get('/package', (req, res) => {
 });
 
 router.get('/thanks', (req, res) => {
-  res.render('hire/thanks');
+  renderThanks(res, 200, { paperworkDone: req.query.paperwork === '1' });
+});
+
+router.post('/paperwork', hireLimiter, handlePaperworkUpload, async (req, res) => {
+  const b = req.body || {};
+  // Honeypot: bots fill the hidden "website" field. Pretend success, save nothing.
+  if (str(b.website, 200)) return res.redirect('/hire/thanks?paperwork=1');
+
+  const v = {
+    full_name: str(first(b.full_name), 120),
+    email: str(first(b.email), 160),
+    dob: str(first(b.dob), 10),
+  };
+  const errors = [];
+  if (!v.full_name) errors.push('Full name is required.');
+  if (!isEmail(v.email)) errors.push('Enter a valid email address.');
+  const dob = validDate(v.dob);
+  if (!dob) errors.push('Enter a valid date of birth.');
+  else {
+    const age = (Date.now() - dob.getTime()) / (365.25 * 24 * 3600 * 1000);
+    if (age < 18 || age > 100) errors.push('Date of birth looks wrong — drivers must be at least 18.');
+  }
+  const { errors: docErrors, docs } = validatePaperworkDocs(req.files);
+  const allErrors = errors.concat(docErrors);
+  if (allErrors.length) {
+    return renderThanks(res, 400, { paperworkErrors: allErrors, paperworkValues: v });
+  }
+
+  const { matched } = await softMatch(v);
+
+  // Save all pages atomically — never a half-saved set of paperwork.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const d of docs) {
+      if (matched) {
+        await client.query(
+          `INSERT INTO application_documents (application_id, doc_type, filename, mimetype, size_bytes, data)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [matched.id, d.doc_type, d.filename, d.mimetype, d.size, d.buffer]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO paperwork_uploads (full_name, email, dob, doc_type, filename, mimetype, size_bytes, data, source_ip)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [v.full_name, v.email.toLowerCase(), v.dob || null, d.doc_type, d.filename, d.mimetype, d.size, d.buffer,
+           (req.ip || '').slice(0, 45)]
+        );
+      }
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  res.redirect('/hire/thanks?paperwork=1');
 });
 
 router.post('/package', hireLimiter, async (req, res) => {

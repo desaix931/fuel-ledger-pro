@@ -4,3 +4,43 @@
   <p>Your DOT compliance hiring package is in. The office will match it to your application and reach out with next steps — the MVR, Clearinghouse query, previous-employer checks, and pre-employment drug test.</p>
   <p class="muted">Desaix Transport LLC · Crossville, TN</p>
 </div>
+
+<div class="card">
+  <h2 style="margin-top:0">Next steps — two more forms</h2>
+  <p>While the office processes your package, take care of these two forms:</p>
+  <ol>
+    <li style="margin-bottom:.8rem"><strong>IRS Form W-4 (2026)</strong> — the federal tax withholding form.
+      Print it, fill it out completely, and sign it.<br>
+      <a class="btn" href="https://www.irs.gov/pub/irs-pdf/fw4.pdf" target="_blank" rel="noopener" style="margin-top:.4rem">Download Form W-4 (PDF)</a></li>
+    <li><strong>Company NDA</strong> — our confidentiality agreement. Print it, read it, and sign it.
+      <% if (ndaAvailable) { %><br>
+      <a class="btn" href="/forms/nda" style="margin-top:.4rem">Download the NDA (PDF)</a>
+      <% } else { %><br>
+      <span class="muted">The office will provide the company NDA form.</span>
+      <% } %></li>
+  </ol>
+  <p class="muted" style="font-size:.9rem">Then send us photos of the finished forms using the upload below — they are filed with your other credentials. Clear, flat, well-lit photos work best; you can attach up to 4 pages per form.</p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Upload your W-4 &amp; signed NDA</h2>
+  <% if (paperworkDone) { %><div class="alert ok">Paperwork received — thank you. Your W-4 / NDA photos have been filed. If you still have pages to send, you can upload them below too.</div><% } %>
+  <% if (paperworkErrors && paperworkErrors.length) { %><div class="alert err"><% paperworkErrors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
+  <p class="muted" style="font-size:.9rem">Enter the same name, email, and date of birth you used on your job application so we can file these with it.</p>
+  <form method="post" action="/hire/paperwork" enctype="multipart/form-data">
+    <!-- honeypot: real drivers never see or fill this -->
+    <div style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+      <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+    </div>
+    <label>Full name <input type="text" name="full_name" required maxlength="120" autocomplete="name" value="<%= paperworkValues.full_name %>"></label>
+    <div class="filters">
+      <label>Email <input type="email" name="email" required maxlength="160" autocomplete="email" value="<%= paperworkValues.email %>"></label>
+      <label>Date of birth <input type="date" name="dob" required value="<%= paperworkValues.dob %>"></label>
+    </div>
+    <label>Completed W-4 — photo(s), up to 4 pages
+      <input type="file" name="doc_w4" accept="image/jpeg,image/png,image/webp" multiple></label>
+    <label>Signed NDA — photo(s), up to 4 pages
+      <input type="file" name="doc_nda" accept="image/jpeg,image/png,image/webp" multiple></label>
+    <p><button class="btn-primary" type="submit">Upload paperwork</button></p>
+  </form>
+</div>

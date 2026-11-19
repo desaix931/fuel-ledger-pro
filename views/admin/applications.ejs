@@ -2,6 +2,24 @@
 <h1>Job applications</h1>
 <% if (msg === 'updated') { %><p class="alert ok">Status updated.</p><% } %>
 <% if (msg === 'deleted') { %><p class="alert ok">Application deleted.</p><% } %>
+<% if (paperwork && paperwork.length) { %>
+<div class="card">
+  <h2 style="margin-top:0">W-4 / NDA uploads — no matching application</h2>
+  <p class="muted">These forms were uploaded after a DOT package but didn't match an application on name/email/DOB. Matched uploads are filed under the application's Documents instead.</p>
+  <table class="grid">
+    <tr><th>Name</th><th>Uploaded</th><th>Form</th><th>DOB given</th><th></th></tr>
+    <% paperwork.forEach((d) => { const url = '/admin/applications/paperwork/' + d.id; %>
+      <tr>
+        <td><strong><%= d.full_name %></strong><br><span class="muted" style="font-size:.8rem"><%= d.email %></span></td>
+        <td><%= fmtDateTime(d.created_at) %></td>
+        <td><%= d.doc_type === 'w4' ? 'IRS Form W-4' : 'Signed NDA' %></td>
+        <td><%= d.dob ? fmtDate(d.dob) : '—' %></td>
+        <td><a href="<%= url %>" target="_blank" rel="noopener">View</a> · <a href="<%= url %>?download=1">Download</a></td>
+      </tr>
+    <% }) %>
+  </table>
+</div>
+<% } %>
 <div class="card">
   <% if (!apps.length) { %>
     <p class="muted">No applications yet. The public form lives at <a href="/apply">/apply</a>.</p>
