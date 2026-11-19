@@ -1,6 +1,6 @@
 <% const title = 'DOT Compliance Hiring Package'; %>
 <h1>DOT Compliance Hiring Package</h1>
-<p class="muted">Desaix Transport LLC · Crossville, TN — the pre-hire qualification paperwork for prospective drivers. This is <strong>separate from the job application</strong>; fill it out after you've applied.</p>
+<p class="muted">DeSaix Transport LLC · Crossville, TN — the pre-hire qualification paperwork for prospective drivers. This is <strong>separate from the job application</strong>; fill it out after you've applied.</p>
 <% if (errors && errors.length) { %><div class="alert err"><% errors.forEach((e) => { %><div><%= e %></div><% }) %></div><% } %>
 
 <form method="post" action="/hire/package" id="hireform">
@@ -48,7 +48,7 @@
     <button type="button" class="btn btn-sm" id="addemployer">+ Add another employer</button>
 
     <div style="border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:1rem 0;background:var(--wash,#f8f8f8)">
-      <p style="font-size:.9rem;margin:.3rem 0"><strong>Authorization.</strong> I authorize Desaix Transport LLC to obtain my safety performance history — including drug and alcohol testing records — from each employer listed above, and I authorize each listed employer to release that information to Desaix Transport LLC, as required by 49 CFR 391.23.</p>
+      <p style="font-size:.9rem;margin:.3rem 0"><strong>Authorization.</strong> I authorize DeSaix Transport LLC to obtain my safety performance history — including drug and alcohol testing records — from each employer listed above, and I authorize each listed employer to release that information to DeSaix Transport LLC, as required by 49 CFR 391.23.</p>
     </div>
     <div class="filters">
       <label>Type your full name as your signature * <input type="text" name="release_signature" required maxlength="120" value="<%= values.release_signature %>"></label>
@@ -75,7 +75,7 @@
 
   <div class="card">
     <h2 style="margin-top:0">D. FMCSA Drug &amp; Alcohol Clearinghouse acknowledgment</h2>
-    <p style="font-size:.9rem">Desaix Transport LLC will run a <strong>full pre-employment query of the FMCSA Drug &amp; Alcohol Clearinghouse</strong> before you perform any safety-sensitive functions. You must be <strong>registered in the Clearinghouse</strong> and provide <strong>electronic consent</strong> for the query when requested.</p>
+    <p style="font-size:.9rem">DeSaix Transport LLC will run a <strong>full pre-employment query of the FMCSA Drug &amp; Alcohol Clearinghouse</strong> before you perform any safety-sensitive functions. You must be <strong>registered in the Clearinghouse</strong> and provide <strong>electronic consent</strong> for the query when requested.</p>
     <label style="display:block;margin:.6rem 0">
       <input type="checkbox" name="clearinghouse_ack" value="yes" required style="width:auto" <%= values.clearinghouse_ack === 'yes' ? 'checked' : '' %>>
       <strong>I understand the Clearinghouse query requirement and will register and provide electronic consent when asked. *</strong>
@@ -124,7 +124,7 @@
 
   <div class="card">
     <h2 style="margin-top:0">G. Road test acknowledgment <span class="muted" style="font-weight:400;font-size:.8rem">(49 CFR 391.33)</span></h2>
-    <p style="font-size:.9rem">I hold a valid commercial driver's license. Desaix Transport LLC accepts my valid CDL in lieu of a road test, as permitted by 49 CFR 391.33.</p>
+    <p style="font-size:.9rem">I hold a valid commercial driver's license. DeSaix Transport LLC accepts my valid CDL in lieu of a road test, as permitted by 49 CFR 391.33.</p>
     <label style="display:block;margin:.6rem 0">
       <input type="checkbox" name="road_test_ack" value="yes" required style="width:auto" <%= values.road_test_ack === 'yes' ? 'checked' : '' %>>
       <strong>I hold a valid CDL, which the carrier may accept in lieu of a road test. *</strong>

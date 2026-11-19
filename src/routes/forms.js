@@ -19,7 +19,7 @@ router.get('/nda', (req, res) => {
   if (!ndaFileExists()) {
     return res.status(404).send('The company NDA form is not available for download yet — the office will provide it.');
   }
-  res.download(NDA_PATH, 'Desaix-NDA.pdf');
+  res.download(NDA_PATH, 'DeSaix-NDA.pdf');
 });
 
 module.exports = router;
